@@ -29,6 +29,7 @@ We use [uv](https://docs.astral.sh/uv/) to manage dependencies and virtual envir
 
 Please read our [Contributing Guide](CONTRIBUTING.md) before starting to work on the project.
 
+
 ### 1. Setup
 Clone the repository and install the environment:
 ```bash
