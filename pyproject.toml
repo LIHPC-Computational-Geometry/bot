@@ -1,0 +1,21 @@
+[project]
+name = "bot"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "gmsh>=4.15.0",
+    "panda3d>=1.10.16",
+]
+
+[dependency-groups]
+dev = [
+    "pdoc>=16.0.0",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "--cov=. --cov-report=html --cov-report=term"
+testpaths = ["tests"]
