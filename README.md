@@ -2,7 +2,8 @@
 
 ![Tests](https://github.com/franck-ledoux/bot/actions/workflows/tests.yml/badge.svg)
 ![Coverage](https://codecov.io/gh/franck-ledoux/bot/branch/main/graph/badge.svg?token=CODECOV_TOKEN)
-![Documentation](https://github.com/franck-ledoux/bot/actions/workflows/documentation.yml/badge.svg)
+
+<!-- ![Documentation](https://github.com/franck-ledoux/bot/actions/workflows/documentation.yml/badge.svg)' -->
 
 # Commandes pour travailler
 
