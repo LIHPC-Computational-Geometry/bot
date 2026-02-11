@@ -33,8 +33,7 @@ jobs:
         run: uv sync --dev
 
       - name: Build Docs with pdoc
-        # Vérifiez bien que 'mon_projet' est le nom du dossier qui contient votre __init__.py
-        run: uv run pdoc ./mon_projet -o ./docs_out
+        run: uv run pdoc ./bot -o ./docs_out
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
