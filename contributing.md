@@ -1,5 +1,6 @@
 # Contributing to Bot Project 
 
+This section is here to explain how to contribute to this project.
 
 ## 📜 Code of Conduct
 By participating in this project, you agree to abide by our code of conduct: be respectful, professional, and collaborative.
@@ -12,7 +13,7 @@ We use `uv` for all dependency management. To set up your environment:
 git checkout -b feature/your-feature-name
 uv sync
 ```
-
+  
 ###  2. Coding Standards
 - **Formatting:** We follow standard Python conventions. Please ensure your code is clean and readable.
 - **Docstrings:** All new functions and classes must include docstrings in Google Style.
