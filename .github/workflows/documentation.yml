@@ -3,6 +3,12 @@ name: Documentation
 on:
   push:
     branches: [main]
+  workflow_dispatch: # Permet de lancer la doc manuellement pour tester
+
+# Empêche d'avoir plusieurs déploiements en même temps
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -19,16 +25,22 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libglu1-mesa libgl1-mesa-dev libosmesa6 
-      
+
       - name: Install uv
         uses: astral-sh/setup-uv@v3
+
       - name: Install dependencies
         run: uv sync --dev
-      - name: Build Docs
-        run: uv run pdoc ./bot -o ./public 
+
+      - name: Build Docs with pdoc
+        # Vérifiez bien que 'mon_projet' est le nom du dossier qui contient votre __init__.py
+        run: uv run pdoc ./mon_projet -o ./docs_out
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './public'
+          path: './docs_out' # On utilise un nom de dossier bien distinct
+
       - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
