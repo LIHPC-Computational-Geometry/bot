@@ -19,3 +19,18 @@ dev = [
 [tool.pytest.ini_options]
 addopts = "--cov=. --cov-report=html --cov-report=term"
 testpaths = ["tests"]
+
+
+[tool.ruff]
+# On cible la version de Python utilisée
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+# "E" (Error), "F" (Pyflakes), "I" (Isort), "UP" (Pyupgrade)
+select = ["E", "F", "I", "UP", "N"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
