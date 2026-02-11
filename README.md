@@ -1,7 +1,7 @@
 # BOT, BlOcking Toolkit
 
 ![Tests](https://github.com/franck-ledoux/bot/actions/workflows/tests.yml/badge.svg)
-![Coverage](https://codecov.io/gh/franck-ledoux/bot/branch/main/graph/badge.svg?token=CODECOV_TOKEN)
+[![codecov](https://codecov.io/gh/franck-ledoux/bot/graph/badge.svg?token=HGY9PK4OA4)](https://codecov.io/gh/franck-ledoux/bot)
 
 <!-- ![Documentation](https://github.com/franck-ledoux/bot/actions/workflows/documentation.yml/badge.svg)' -->
 
