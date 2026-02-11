@@ -33,7 +33,7 @@ jobs:
         run: uv sync --dev
 
       - name: Build Docs with pdoc
-        run: uv run pdoc ./bot -o ./docs_out
+        run: uv run pdoc ./bot -o ./docs_out --docformat google
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
