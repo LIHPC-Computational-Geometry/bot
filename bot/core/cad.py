@@ -1,72 +1,85 @@
 import gmsh
 import numbers
+from pathlib import Path
 
 """"global value to indicate how to round floating numbers"""
 nb_digit_rounding = 4
 
 
-class Api:
+class Model:
     """
     The geometric model provides simple and basic function to load geometric files and to query a geometric model
     based on the OpenCascade technology. To do so, we totally rely on the gmsh library.
     """
-    @staticmethod
-    def initialize():
+    def __init__(self):
+        self.initialize()
+        self._observers = []
+        self.bounds = {'min': [0,0,0], 'max': [0,0,0]}
+
+    def add_observer(self, observer):
+        self._observers.append(observer)
+
+    def _notify_observers(self):
+        for observer in self._observers:
+            observer.update(self)
+        
+    def initialize(self):
         """
-        geom.api.Api.import_model(filename)
+        core.cad.Model.initialize()
 
         initialize the gmsh context useful for the geometric model. This operation must be called before any
         other operations.
         """
         gmsh.initialize()
+        # We clear the gmsh context in order to add new 
         gmsh.clear()
         # to avoid messages on the console
         gmsh.option.setNumber("General.Verbosity", 0)
         gmsh.option.setNumber("Mesh.MeshSizeMin", 1)
         gmsh.option.setNumber("Mesh.MeshSizeMax", 5)
 
-    @staticmethod
-    def import_geo(filename):
+    def finalize(self):
         """
-        geom.api.Api.import_model(filename)
+        core.cad.Model.finalize()
+        This operation must be called at the end of the program to finalize the gmsh context.
 
-        import the model contained in the file named `filenanme`, which is the path to
-        the file to import
-
-        Types:
-        - `filenanme`: string
-        """
-        gmsh.model.occ.importShapes(filename)
-        gmsh.model.occ.synchronize()
-
-
-    @staticmethod
-    def open_geo(filename):
-        """
-        geom.api.Api.open_geo(filename)
-
-        open the file `filenanme`, which contains the path to
-        the file to open (extension .geo)
-
-        Types:
-        - `filenanme`: string
-        """
-        gmsh.open(filename)
-        gmsh.model.occ.synchronize()
-
-    @staticmethod
-    def finalize():
-        """
-        geom.api.Api.finalize()
-
-        This operation must be called at the end of the program to finalize the gmsh context
+        If this operation is called, it is impossible to use this obkject anymore.
         """
         gmsh.finalize()
 
-    @staticmethod
-    def synchronize():
+    def open(self,filename):
         """
-       geom.api.Api.synchronize()
+        core.cad.Model.open(filename)
+
+        open the model contained in the file named `filename`, which is the path to
+        the file to import. The model is clear beforehand
+
+        Types:
+        - `filename`: string
+        """
+        if Path(filename).suffix == ".geo":
+                gmsh.open(filename)
+        else:
+            gmsh.model.occ.importShapes(filename)
+
+        self.discretize()
+        node_tags, coords, _ = gmsh.model.mesh.getNodes()
+        node_map = {tag: i for i, tag in enumerate(node_tags)}
+        self.points = [(coords[i], coords[i+1], coords[i+2]) for i in range(0, len(coords), 3)]
+
+        # Calcul des bornes pour le Zoom Auto
+        xs, ys, zs = zip(*self.points)
+        self.bounds = {
+            'min': [min(xs), min(ys), min(zs)],
+            'max': [max(xs), max(ys), max(zs)],
+            'center': [(min(xs)+max(xs))/2, (min(ys)+max(ys))/2, (min(zs)+max(zs))/2],
+            'size': [max(xs)-min(xs), max(ys)-min(ys), max(zs)-min(zs)]
+        }
+        self.__synchronize()
+
+    def __synchronize(self):
+        """
+       core.cad.Model.synchronize()
 
         This operation must be invocated after applying geometric operations to be sure to have a consistent state.
         We advise to call this method before starting the meshing stage.
@@ -74,12 +87,11 @@ class Api:
         gmsh.model.occ.synchronize()
 
 
-    @staticmethod
-    def __get_cell_tags(dim):
+    def __get_cell_tags(self, dim):
         """
         Private method that returns the tags, i.e. the ids, of the cells of dimension dim.
         This operation is private and must not be called directly outside the scope of public operations of
-        geom.api.Api
+        cad.Model
 
         Args:
         dim (int): An int included in [0,3].
@@ -100,37 +112,34 @@ class Api:
         return tags
 
 
-    @staticmethod
-    def get_point_tags():
+    def get_point_tags(self):
         """
-        geom.api.Api.get_point_tags(dim)
+        core.cad.Model.get_point_tags(dim)
 
         returns the tags of all the points
         """
-        return Api.__get_cell_tags(0)
+        return self.__get_cell_tags(0)
 
-    @staticmethod
-    def get_curve_tags():
+    def get_curve_tags(self):
         """
-        geom.api.Api.get_curve_tags(dim)
+        core.cad.Model.get_curve_tags(dim)
 
         return the tags of all the curves
         """
-        return Api.__get_cell_tags(1)
-    @staticmethod
-    def get_surface_tags():
+        return self.__get_cell_tags(1)
+
+    def get_surface_tags(self):
         """
-        geom.api.Api.get_surface_tags(dim)
+        core.cad.Model.get_surface_tags(dim)
 
         return the tags of all the surfaces
         """
-        return Api.__get_cell_tags(2)
+        return self.__get_cell_tags(2)
 
 
-    @staticmethod
-    def getClosestPoint(dim, tag, coord):
+    def getClosestPoint(self,dim, tag, coord):
         """
-        geom.api.Api.getClosestPoint(dim, tag, coord)
+        core.cad.Model.getClosestPoint(dim, tag, coord)
 
         Get the points `closestCoord` on the entity of dimension `dim` (1 or 2) and
         tag `tag` to the points `coord`, by orthogonal projection. `coord` is given
@@ -160,10 +169,9 @@ class Api:
 
         return gmsh.model.getClosestPoint(dim, tag, coord)[0]
 
-    @staticmethod
-    def get_end_points(curve_tag):
+    def get_end_points(self,curve_tag):
         """
-        geom.api.Api.get_end_points(curve_tag)
+        core.cad.Model.get_end_points(curve_tag)
 
         Get the tags of the end points of the curve of id `curve_tag `
         Return `closestCoord`, `parametricCoord`.
@@ -171,18 +179,17 @@ class Api:
         data = gmsh.model.getAdjacencies(1, curve_tag)
         return data[1]
 
-    @staticmethod
-    def get_adjacent_curves_of_point(point_tag):
+    def get_adjacent_curves_of_point(self, point_tag):
 
         # We check if the tag is an existing point tag
-        if not point_tag in Api.get_point_tags() :
+        if not point_tag in self.get_point_tags() :
             raise ValueError("Invalid point tag")
 
         curves = []
         # Traverse all the model curves
-        for curve_tag in Api.get_curve_tags():
+        for curve_tag in self.get_curve_tags():
             # get curve end points
-            end_points = Api.get_end_points(curve_tag)
+            end_points = self.get_end_points(curve_tag)
             if end_points[0] == point_tag :
                 curves.append(curve_tag)
             elif end_points[1] == point_tag :
@@ -202,7 +209,7 @@ class Api:
 
         This function accesses the Gmsh framework to extract a list of curves
         that define the boundary of a specified face. It utilizes the
-        get_curve_loops method from the occ API. Only the primary set of
+        get_curve_loops method from the occ Model. Only the primary set of
         curves is returned from the nested output.
 
         :param face_tag: The identifier tag of the target face in the Gmsh model.
@@ -245,9 +252,57 @@ class Api:
 
         return corners
 
-    @staticmethod
-    def __discretize():
-        Api.synchronize()
+    def get_curve_discretization(self):
+        # Get mesh node tags and their coordinates
+        node_tags, coords, _ = gmsh.model.mesh.getNodes()
+        node_id_to_index = {tag: i for i, tag in enumerate(node_tags)}
+        # Get all the entities of dim 1
+        elem_types, elem_tags, elem_node_tags = gmsh.model.mesh.getElements(dim=1)
+
+
+        # On transforme la liste plate [x,y,z,x,y,z] en liste de tuples [(x,y,z), ...]
+        points_3d = []
+        for i in range(0, len(coords), 3):
+            points_3d.append((coords[i], coords[i+1], coords[i+2]))
+
+
+
+        # 2. Liste finale des données
+        # Structure : (index_sommet_A, index_sommet_B, tag_courbe_origine)
+        edges_with_metadata = []
+
+        # 3. Parcourir chaque "Courbe" (entité de dimension 1)
+        entities = gmsh.model.getEntities(1) 
+
+        for entity in entities:
+            curve_tag = entity[1] # C'est le Tag de la courbe CAO
+            
+            # Récupérer les éléments (segments) appartenant UNIQUEMENT à cette courbe
+            _, _, node_tags_per_elem = gmsh.model.mesh.getElements(1, curve_tag)
+            
+            if len(node_tags_per_elem) > 0:
+                connectivity = node_tags_per_elem[0]
+                
+                # Parcourir les nœuds par paires pour former les arêtes
+                for i in range(0, len(connectivity), 2):
+                    tag_a = connectivity[i]
+                    tag_b = connectivity[i+1]
+                    
+                    # Conversion en indices (0, 1, 2...) pour Panda3D
+                    idx_a = node_id_to_index[tag_a]
+                    idx_b = node_id_to_index[tag_b]
+                    
+                    edges_with_metadata.append((idx_a, idx_b, curve_tag))
+
+        return points_3d, edges_with_metadata
+    
+    def discretize(self):
+        self.__synchronize()
+        gmsh.model.mesh.clear()
+        gmsh.model.mesh.generate(1)
+
+    def __discretize(self):
+        self.__synchronize()
         gmsh.model.mesh.generate(2)
         # Get mesh nodes
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
@@ -260,7 +315,7 @@ class Api:
         # === 2. Get all face elements (triangles & quads) ===
         surfaces = []
         # type 1 = edge, type 2 = triangle, type 15 = point
-        surf_tags = Api.get_face_tags()
+        surf_tags = self.get_face_tags()
         for i in surf_tags:
             element_types, element_tags, node_tags_list = gmsh.model.mesh.getElements(2, i)
             faces=[]

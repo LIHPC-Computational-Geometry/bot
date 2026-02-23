@@ -20,6 +20,9 @@ class ColorGenerator:
 
 class ActorBuilder:
     def __init__(self, render):
+        """
+
+        """
         self.nb_actors = 0
         self.render = render
 
@@ -142,7 +145,7 @@ class ActorBuilder:
         lines.setThickness(2.0)
         lines.setColor(1, 1, 1, 1)  # Black
 
-        for i, j in edges:
+        for i, j, k in edges:
             lines.moveTo(vertices[i])
             lines.drawTo(vertices[j])
 

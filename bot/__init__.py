@@ -6,9 +6,11 @@ Submodules:
 - model: this module provides business classes and functions (for geometry and mesh)
 
 - view: View module with GUI and 2D/3D visualization capabilities
+
+- control: Control module to control the whole app
 """
 
-from . import model, view
+from . import core, view
 
 # list of sub-modules the user will see when he writes 'from bot import *'
-__all__ = ['model', 'view']
+__all__ = ['core', 'control', 'view']
