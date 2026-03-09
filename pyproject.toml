@@ -4,10 +4,19 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
+
 dependencies = [
     "gmsh>=4.15.0",
+    "ipython>=9.10.0",
     "panda3d>=1.10.16",
 ]
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
@@ -21,16 +30,3 @@ addopts = "--cov=. --cov-report=html --cov-report=term"
 testpaths = ["tests"]
 
 
-[tool.ruff]
-# On cible la version de Python utilisée
-target-version = "py312"
-line-length = 88
-
-[tool.ruff.lint]
-# "E" (Error), "F" (Pyflakes), "I" (Isort), "UP" (Pyupgrade)
-select = ["E", "F", "I", "UP", "N"]
-ignore = []
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"

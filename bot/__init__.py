@@ -2,15 +2,21 @@
 bot module: the complete bot application
 
 Submodules:
+- core:   geometric kernel (CAD model via gmsh)
+- viewer: Panda3D viewer, connectable to a Model
+- view:   rendering components (internal)
+- control: camera, keyboard, mouse controllers (internal)
 
-- model: this module provides business classes and functions (for geometry and mesh)
-
-- view: View module with GUI and 2D/3D visualization capabilities
-
-- control: Control module to control the whole app
+Quick start:
+    import bot
+    k = bot.Model()
+    k.open("part.geo")
+    v = bot.Viewer()
+    v.connect(k).run()
 """
 
 from . import core, view
+from .core.cad import Model as CADModel
+from .viewer import Viewer
 
-# list of sub-modules the user will see when he writes 'from bot import *'
-__all__ = ['core', 'control', 'view']
+__all__ = ['core', 'control', 'view', 'viewer', 'Model', 'Viewer']

@@ -5,7 +5,6 @@ from pathlib import Path
 """"global value to indicate how to round floating numbers"""
 nb_digit_rounding = 4
 
-
 class Model:
     """
     The geometric model provides simple and basic function to load geometric files and to query a geometric model
@@ -18,6 +17,9 @@ class Model:
 
     def add_observer(self, observer):
         self._observers.append(observer)
+
+    def remove_observer(self, observer):
+        self._observers.remove(observer)
 
     def _notify_observers(self):
         for observer in self._observers:
@@ -62,20 +64,48 @@ class Model:
         else:
             gmsh.model.occ.importShapes(filename)
 
-        self.discretize()
-        node_tags, coords, _ = gmsh.model.mesh.getNodes()
-        node_map = {tag: i for i, tag in enumerate(node_tags)}
-        self.points = [(coords[i], coords[i+1], coords[i+2]) for i in range(0, len(coords), 3)]
+        self._discretize_curves()
+        self._recompute_bounds()
+        self.__synchronize()
 
-        # Calcul des bornes pour le Zoom Auto
+    def _recompute_bounds(self):
+        node_tags, coords, _ = gmsh.model.mesh.getNodes()
+        # The map will be used later to store some geom info
+        # node_map = {tag: i for i, tag in enumerate(node_tags)}
+        self.points = [(coords[i], coords[i+1], coords[i+2]) for i in range(0, len(coords), 3)]
+        if not self.points:
+            return
+        #Compute now the bounds for automatic rescaling
         xs, ys, zs = zip(*self.points)
         self.bounds = {
             'min': [min(xs), min(ys), min(zs)],
             'max': [max(xs), max(ys), max(zs)],
             'center': [(min(xs)+max(xs))/2, (min(ys)+max(ys))/2, (min(zs)+max(zs))/2],
-            'size': [max(xs)-min(xs), max(ys)-min(ys), max(zs)-min(zs)]
+            'size': [max(xs)-min(xs), max(ys)-min(ys), max(zs)-min(zs)],
         }
-        self.__synchronize()
+
+    def get_render_data(self) -> dict:
+        """Return all display data needed by the viewer (thread-safe, no gmsh dependency)."""
+        points, edges = self.get_curve_discretization()
+        return {
+            'points': points,
+            'edges': edges,
+            'bounds': dict(self.bounds),
+        }
+
+    def add_point(self, coords: list, mesh_size: float = 1.0) -> int:
+        """
+        Add a free point to the model at position coords = [x, y, z].
+        Returns the gmsh tag of the new point.
+        Notifies all connected viewers.
+        """
+        tag = gmsh.model.occ.addPoint(coords[0], coords[1], coords[2], mesh_size)
+        gmsh.model.occ.synchronize()
+        gmsh.model.mesh.clear()
+        gmsh.model.mesh.generate(1)
+        self._recompute_bounds()
+        self._notify_observers()
+        return tag
 
     def __synchronize(self):
         """
@@ -159,11 +189,9 @@ class Model:
             raise TypeError("the dimension parameter (dim) must be an int.")
         if not isinstance(tag, int):
             raise TypeError("the tag parameter (tag) must be an int.")
-        if not isinstance(dim, int):
-            return isinstance(coord, (list,tuple)) and len(coord) == 3 and all(
-                isinstance(x, numbers.Real) for x in coord)
-
-            raise TypeError("the dimension parameter (dim) must be an int.")
+        if not isinstance(coord, (list, tuple)) or len(coord)%3 != 0 or not all(
+                isinstance(x, numbers.Real) for x in coord):
+            raise TypeError("the coord parameter must be a list or tuple of 3 real numbers.")
         if dim < 1 or dim > 2:
             raise ValueError("the dim parameter must be an int comprised between 1 and 2.")
 
@@ -197,11 +225,7 @@ class Model:
         return curves
 
     def get_adjacent_points(self, curve_tag):
-        points = []
-        for adj in self.__l2p:
-            if adj[0] is curve_tag:
-                points.append(adj[1])
-        return points
+        return list(self.get_end_points(curve_tag))
 
     def get_curves(self, face_tag):
         """
@@ -231,14 +255,13 @@ class Model:
         :rtype: list[int]
         """
         curves = gmsh.model.getAdjacencies(2, face_tag)[1]
-        all_points = get_point_tags()
         corners = []
         for i_curve in range(0, len(curves)):
             j_index = i_curve - 1
             if i_curve == 0:
                 j_index = len(curves) - 1
-            prev_pnts = get_end_points(curves[j_index])
-            current_pnts = get_end_points(curves[i_curve])
+            prev_pnts = self.get_end_points(curves[j_index])
+            current_pnts = self.get_end_points(curves[i_curve])
             common_pnt = 0
             if prev_pnts[0] == current_pnts[0]:
                 common_pnt = current_pnts[0]
@@ -296,12 +319,12 @@ class Model:
 
         return points_3d, edges_with_metadata
     
-    def discretize(self):
+    def _discretize_curves(self):
         self.__synchronize()
         gmsh.model.mesh.clear()
         gmsh.model.mesh.generate(1)
 
-    def __discretize(self):
+    def __discretize_surfaces(self):
         self.__synchronize()
         gmsh.model.mesh.generate(2)
         # Get mesh nodes
@@ -315,7 +338,7 @@ class Model:
         # === 2. Get all face elements (triangles & quads) ===
         surfaces = []
         # type 1 = edge, type 2 = triangle, type 15 = point
-        surf_tags = self.get_face_tags()
+        surf_tags = self.get_surface_tags()
         for i in surf_tags:
             element_types, element_tags, node_tags_list = gmsh.model.mesh.getElements(2, i)
             faces=[]

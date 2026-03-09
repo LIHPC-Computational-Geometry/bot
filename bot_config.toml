@@ -1,14 +1,12 @@
 [paths]
 working_directory = "./models"
 
-[view.display]
+[view.scene]
 background_color = [0.1, 0.1, 0.12]  # Night grey
-show_marker_at_start = false
-line_thickness = 2.5
-marker_scale = 1.0
+line_thickness = 2
 
 [view.camera]
-pan_speed = 15.0
+pan_speed = 10.0
 rotate_speed = 100.0
-zoom_factor = 0.1
 animation_duration = 0.5
+show_marker_at_start = false
