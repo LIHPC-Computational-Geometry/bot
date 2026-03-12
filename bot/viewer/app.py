@@ -3,8 +3,9 @@ import tomllib
 import os
 
 from direct.showbase.ShowBase import ShowBase
+from panda3d.core import WindowProperties
 
-from bot.view.components import Scene
+from bot.view.scene import Scene
 from bot.control.camera import CameraController
 from bot.control.mouse import MouseHandler
 from bot.control.keyboard import KeyboardHandler
@@ -29,7 +30,20 @@ class ViewerApp(ShowBase):
     """
 
     def __init__(self, config_filename: str, cmd_queue: queue.Queue, on_event_cb):
+        """
+        Args:
+            config_filename: Path (relative to the project root) of the TOML
+                             config file.
+            cmd_queue:       Thread-safe queue fed by the pipe-reader thread.
+                             Commands are ``('load'|'update'|'reload_config', data)``.
+            on_event_cb:     Callable ``(event_type, data)`` used to send events
+                             (e.g. picking) back to the parent process.
+        """
         super().__init__()
+
+        wp = WindowProperties()
+        wp.setTitle("bot")
+        self.win.requestProperties(wp)
 
         self._cmd_queue = cmd_queue
         self._on_event_cb = on_event_cb
@@ -38,12 +52,13 @@ class ViewerApp(ShowBase):
 
         self._config = self._load_config(config_filename)
 
-        self.kb_handler = KeyboardHandler()
-        self.mouse_handler = MouseHandler()
+        self.kb_handler = KeyboardHandler(self)
+        self.mouse_handler = MouseHandler(self)
 
         taskMgr.add(self._process_commands, "ViewerProcessCommands")
 
     def _load_config(self, config_filename: str) -> dict:
+        """Load and parse the TOML config file. Returns an empty dict if not found."""
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         path = os.path.join(base_dir, config_filename)
         if os.path.exists(path):
@@ -52,14 +67,24 @@ class ViewerApp(ShowBase):
         return {}
 
     def _scene_cfg(self) -> dict:
+        """Return the ``[view.scene]`` section of the config, or built-in defaults."""
         return self._config.get('view', {}).get('scene', _DEFAULT_SCENE)
 
     def _camera_cfg(self) -> dict:
+        """Return the ``[view.camera]`` section merged with built-in defaults."""
         cfg = _DEFAULT_CAMERA.copy()
         cfg.update(self._config.get('view', {}).get('camera', {}))
         return cfg
 
     def _process_commands(self, task):
+        """
+        Per-frame task: drain the command queue and dispatch each command.
+
+        Supported commands: ``load``, ``update``, ``reload_config``.
+
+        Returns:
+            task.cont to keep the task alive.
+        """
         while not self._cmd_queue.empty():
             try:
                 cmd, data = self._cmd_queue.get_nowait()
@@ -89,7 +114,7 @@ class ViewerApp(ShowBase):
         else:
             self._camera_controller.scene = self._scene
 
-        self._camera_controller.instant_recenter()
+        self._camera_controller.recenter()
 
     def update_scene(self, geom_data: dict):
         """Update geometry without recreating the scene."""

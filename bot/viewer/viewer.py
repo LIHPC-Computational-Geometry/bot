@@ -25,7 +25,6 @@ def _viewer_subprocess(conn, config_filename: str):
     Tourne sur le thread principal du sous-processus → macOS safe.
     """
     import queue as _queue
-
     cmd_queue = _queue.Queue()
 
     # Thread qui lit le pipe parent → met dans la queue interne
@@ -34,6 +33,8 @@ def _viewer_subprocess(conn, config_filename: str):
             try:
                 msg = conn.recv()
                 cmd_queue.put(msg)
+                if msg[0] == 'exit': # Commande de sortie
+                    break
             except EOFError:
                 break
 
@@ -79,6 +80,7 @@ class Viewer:
         self._process = None        # sous-processus Panda3D
         self._event_thread = None   # thread d'écoute des events retour
         self.on_pick: Optional[Callable] = None
+        self._running = False
 
     # ------------------------------------------------------------------
     # API publique
@@ -110,6 +112,8 @@ class Viewer:
         Lance le viewer dans un sous-processus séparé (non-bloquant).
         Retourne self pour le chaînage.
         """
+        self._running = True
+
         ctx = mp.get_context('spawn')
         parent_conn, child_conn = ctx.Pipe()
         self._conn = parent_conn
@@ -128,12 +132,42 @@ class Viewer:
         self._start_event_listener()
         return self
 
+    def stop(self):
+        """
+        Arrête proprement le viewer et libère les ressources.
+        """
+        self._running = False
+
+        # 1. Notifier le modèle qu'on ne regarde plus
+        self.disconnect()
+
+        # 2. Envoyer le signal d'arrêt au sous-processus
+        if self._conn is not None:
+            try:
+                self._send('exit', None)
+            except:
+                pass
+
+        # 3. Attendre la fin du processus
+        if self._process is not None:
+            self._process.join(timeout=2.0) # On laisse 2 secondes pour fermer
+            if self._process.is_alive():
+                self._process.terminate() # Force brute si tjs vivant
+            self._process = None
+
+        # 4. Fermer la communication
+        if self._conn is not None:
+            self._conn.close()
+            self._conn = None
+            
+        self._event_thread = None
+        print("Stopped Viewer")
     # ------------------------------------------------------------------
     # Callback observer (appelé par Model quand l'état change)
     # ------------------------------------------------------------------
 
     def update(self, model: Model):
-        """called by the model through the oberser pattern."""
+        """Called by the Model through the observer pattern when geometry changes."""
         self._send('update', model.get_render_data())
 
     # ------------------------------------------------------------------
@@ -141,6 +175,7 @@ class Viewer:
     # ------------------------------------------------------------------
 
     def _send(self, cmd: str, data):
+        """Send a ``(cmd, data)`` message to the child process over the pipe."""
         if self._conn is not None:
             try:
                 self._conn.send((cmd, data))
@@ -150,13 +185,13 @@ class Viewer:
     def _start_event_listener(self):
         """Thread léger qui reçoit les events du sous-processus (ex : picking)."""
         def _listen():
-            while True:
+            while self._running:
                 try:
                     if self._conn.poll(0.1):
                         event_type, data = self._conn.recv()
                         if event_type == 'pick' and self.on_pick is not None:
                             self.on_pick(data)
-                except EOFError:
+                except (EOFError, BrokenPipeError, AttributeError):
                     break
                 except Exception:
                     pass

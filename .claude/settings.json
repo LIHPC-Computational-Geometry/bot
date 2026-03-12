@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/system/test_cad_workflow.py tests/system/test_model_viewer_pipeline.py -v --no-cov)"
+    ]
+  }
+}

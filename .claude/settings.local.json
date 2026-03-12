@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/unit/test_utils/ tests/unit/test_viewer/ tests/unit/test_cad/ -v --no-cov)"
+    ]
+  }
+}
