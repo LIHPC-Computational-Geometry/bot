@@ -80,11 +80,24 @@ class Viewer:
         self._process = None        # sous-processus Panda3D
         self._event_thread = None   # thread d'écoute des events retour
         self.on_pick: Optional[Callable] = None
+        self.on_hover: Optional[Callable] = None
         self._running = False
+
+
 
     # ------------------------------------------------------------------
     # API publique
     # ------------------------------------------------------------------
+
+    def highlight_curve(self, tag: str, color: list) -> "Viewer":
+        """Colore la géométrie associée à un tag."""
+        self._send('highlight_curve', {'tag': tag, 'color': color})
+        return self
+
+    def set_hud_text(self, text: str) -> "Viewer":
+        """Met à jour le texte affiché en surimpression à l'écran."""
+        self._send('update_hud', {'text': text})
+        return self
 
     def connect(self, model: Model) -> "Viewer":
         """
@@ -159,7 +172,7 @@ class Viewer:
         if self._conn is not None:
             self._conn.close()
             self._conn = None
-            
+
         self._event_thread = None
         print("Stopped Viewer")
     # ------------------------------------------------------------------
@@ -191,6 +204,8 @@ class Viewer:
                         event_type, data = self._conn.recv()
                         if event_type == 'pick' and self.on_pick is not None:
                             self.on_pick(data)
+                        elif event_type == 'hover' and self.on_hover is not None:
+                            self.on_hover(data)
                 except (EOFError, BrokenPipeError, AttributeError):
                     break
                 except Exception:

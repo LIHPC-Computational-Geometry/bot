@@ -4,6 +4,8 @@ import os
 
 from direct.showbase.ShowBase import ShowBase
 from panda3d.core import WindowProperties
+from direct.gui.OnscreenText import OnscreenText
+from panda3d.core import TextNode
 
 from bot.view.scene import Scene
 from bot.control.camera import CameraController
@@ -55,6 +57,19 @@ class ViewerApp(ShowBase):
         self.kb_handler = KeyboardHandler(self)
         self.mouse_handler = MouseHandler(self)
 
+        self._config = self._load_config(config_filename)
+
+        self.kb_handler = KeyboardHandler(self)
+        self.mouse_handler = MouseHandler(self)
+
+        self.hud = OnscreenText(
+            text="",
+            pos=(-1.3, 0.9),
+            scale=0.06,
+            fg=(1, 1, 1, 1),
+            align=TextNode.ALeft
+        )
+
         taskMgr.add(self._process_commands, "ViewerProcessCommands")
 
     def _load_config(self, config_filename: str) -> dict:
@@ -98,6 +113,11 @@ class ViewerApp(ShowBase):
                         self._scene.apply_settings(self._scene_cfg())
                     if self._camera_controller:
                         self._camera_controller.apply_settings(self._camera_cfg())
+                elif cmd == 'highlight_curve':
+                    if self._scene:
+                        self._scene.set_curve_color(data['tag'], data['color'])
+                elif cmd == 'update_hud':
+                    self.hud.setText(data['text'])
             except queue.Empty:
                 break
         return task.cont
