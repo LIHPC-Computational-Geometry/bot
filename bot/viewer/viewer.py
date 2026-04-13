@@ -84,7 +84,7 @@ class Viewer:
 
         self._default_last_hovered = None
 
-        self.on_pick: Optional[Callable] = self._default_on_pick
+        self.on_pick: Optional[Callable] = None
         self.on_hover: Optional[Callable] = self._default_on_hover
 
 
