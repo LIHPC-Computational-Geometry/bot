@@ -59,7 +59,7 @@ class ViewerApp(ShowBase):
 
         self.hud = OnscreenText(
             text="",
-            pos=(-1.3, 0.9),
+            pos=(-1.3, -0.5),
             scale=0.06,
             fg=(1, 1, 1, 1),
             align=TextNode.ALeft
