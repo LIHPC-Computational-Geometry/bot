@@ -21,6 +21,7 @@ class MouseHandler:
         self.base = base
         self.prev_mouse_pos = None
 
+        # FIXME: matrice de projection peut-être pas correct
         self.picker = CollisionTraverser()
         self.pq = CollisionHandlerQueue()
         self.pickerNode = CollisionNode('mouseRay')

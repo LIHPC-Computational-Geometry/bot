@@ -8,6 +8,7 @@ reste entièrement interactif. Les données transitent par un Pipe
 multiprocessing sous forme de dicts sérialisables.
 """
 
+import math
 import multiprocessing as mp
 import threading
 from typing import Callable, Optional
@@ -79,9 +80,12 @@ class Viewer:
         self._conn = None           # extrémité parent du Pipe
         self._process = None        # sous-processus Panda3D
         self._event_thread = None   # thread d'écoute des events retour
-        self.on_pick: Optional[Callable] = None
-        self.on_hover: Optional[Callable] = None
         self._running = False
+
+        self._default_last_hovered = None
+
+        self.on_pick: Optional[Callable] = self._default_on_pick
+        self.on_hover: Optional[Callable] = self._default_on_hover
 
 
 
@@ -213,3 +217,24 @@ class Viewer:
 
         self._event_thread = threading.Thread(target=_listen, daemon=True)
         self._event_thread.start()
+
+    # ------------------------------------------------------------------
+    # Comportements Interactifs par Défaut
+    # ------------------------------------------------------------------
+
+    def _default_on_hover(self, tag):
+        """Comportement par défaut : met en surbrillance la courbe survolée."""
+        if tag is not None:
+            # Nettoyer l'ancienne courbe
+            if self._default_last_hovered is not None and self._default_last_hovered != tag:
+                self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1]) # Blanc
+
+            self.set_hud_text(f"Survol de la courbe {tag}...")
+            self.highlight_curve(tag, [1, 0, 0, 1]) # Rouge
+            self._default_last_hovered = tag
+        else:
+            # Survol dans le vide
+            if self._default_last_hovered is not None:
+                self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1])
+                self.set_hud_text("Prêt. Survolez ou cliquez sur les courbes.")
+                self._default_last_hovered = None

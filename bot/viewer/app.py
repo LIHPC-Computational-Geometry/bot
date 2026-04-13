@@ -57,11 +57,6 @@ class ViewerApp(ShowBase):
         self.kb_handler = KeyboardHandler(self)
         self.mouse_handler = MouseHandler(self)
 
-        self._config = self._load_config(config_filename)
-
-        self.kb_handler = KeyboardHandler(self)
-        self.mouse_handler = MouseHandler(self)
-
         self.hud = OnscreenText(
             text="",
             pos=(-1.3, 0.9),
