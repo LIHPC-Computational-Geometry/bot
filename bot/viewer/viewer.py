@@ -222,18 +222,45 @@ class Viewer:
     # Comportements Interactifs par Défaut
     # ------------------------------------------------------------------
 
-    def _default_on_hover(self, tag):
-        """Comportement par défaut : met en surbrillance la courbe survolée."""
-        if tag is not None:
-            # Nettoyer l'ancienne courbe
-            if self._default_last_hovered is not None and self._default_last_hovered != tag:
-                self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1]) # Blanc
+    # Dans bot/viewer/viewer.py
 
-            self.set_hud_text(f"Survol de la courbe {tag}...")
-            self.highlight_curve(tag, [1, 0, 0, 1]) # Rouge
+    def _default_on_hover(self, tag):
+        """Comportement par défaut : met en surbrillance et affiche les détails spatiaux."""
+        if tag is not None:
+            # 1. Nettoyage de la courbe précédente
+            if self._default_last_hovered is not None and self._default_last_hovered != tag:
+                self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1])
+
+            # 2. Construction du texte d'information
+            info_text = f"--- Courbe {tag} ---\n"
+
+            if self.model is not None:
+                try:
+                    # Récupération des tags des extrémités (ex: [1, 2])
+                    tags_ext = self.model.get_end_points(tag)
+
+                    # Récupération des coordonnées réelles via la nouvelle fonction
+                    coords_a = self.model.get_point_coords(tags_ext[0])
+                    coords_b = self.model.get_point_coords(tags_ext[1])
+
+                    # Formatage pour le HUD
+                    pt_a = f"({coords_a[0]:.2f}, {coords_a[1]:.2f}, {coords_a[2]:.2f})"
+                    pt_b = f"({coords_b[0]:.2f}, {coords_b[1]:.2f}, {coords_b[2]:.2f})"
+
+                    info_text += f"Type : Segment Linéaire\n"
+                    info_text += f"Extrémité A : {pt_a}\n"
+                    info_text += f"Extrémité B : {pt_b}"
+
+                except Exception as e:
+                    info_text += f"Erreur : {str(e)}"
+
+            # 3. Application visuelle
+            self.set_hud_text(info_text)
+            self.highlight_curve(tag, [1, 0.5, 0, 1]) # Orange
             self._default_last_hovered = tag
+
         else:
-            # Survol dans le vide
+            # Gestion du vide
             if self._default_last_hovered is not None:
                 self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1])
                 self.set_hud_text("Prêt. Survolez ou cliquez sur les courbes.")
