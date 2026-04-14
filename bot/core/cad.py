@@ -24,7 +24,7 @@ class Model:
     def _notify_observers(self):
         for observer in self._observers:
             observer.update(self)
-        
+
     def initialize(self):
         """
         core.cad.Model.initialize()
@@ -33,7 +33,7 @@ class Model:
         other operations.
         """
         gmsh.initialize()
-        # We clear the gmsh context in order to add new 
+        # We clear the gmsh context in order to add new
         gmsh.clear()
         # to avoid messages on the console
         gmsh.option.setNumber("General.Verbosity", 0)
@@ -243,6 +243,22 @@ class Model:
         """
         return gmsh.model.occ.get_curve_loops(face_tag)[1][0]
 
+    # Dans bot/core/cad.py
+
+    def get_point_coords(self, point_tag: int) -> list[float]:
+        """
+        Récupère les coordonnées spatiales [x, y, z] d'un point géométrique.
+
+        :param: point_tag: L'identifiant (tag) du point dans le modèle Gmsh.
+        :type: point_tag:int
+        :return: Une liste de trois flottants représentant les coordonnées.
+        :rtype: list[float]
+        """
+        # La dimension 0 correspond aux points dans l'API Gmsh.
+        # gmsh.model.getValue(dimension, tag, parametric_coords)
+        coords = gmsh.model.getValue(0, point_tag, [])
+        return list(coords)
+
     def get_corners(self, face_tag):
         """
         Extracts and returns the corner points of a given face in a geometric model. The method analyzes
@@ -295,30 +311,30 @@ class Model:
         edges_with_metadata = []
 
         # 3. Parcourir chaque "Courbe" (entité de dimension 1)
-        entities = gmsh.model.getEntities(1) 
+        entities = gmsh.model.getEntities(1)
 
         for entity in entities:
             curve_tag = entity[1] # C'est le Tag de la courbe CAO
-            
+
             # Récupérer les éléments (segments) appartenant UNIQUEMENT à cette courbe
             _, _, node_tags_per_elem = gmsh.model.mesh.getElements(1, curve_tag)
-            
+
             if len(node_tags_per_elem) > 0:
                 connectivity = node_tags_per_elem[0]
-                
+
                 # Parcourir les nœuds par paires pour former les arêtes
                 for i in range(0, len(connectivity), 2):
                     tag_a = connectivity[i]
                     tag_b = connectivity[i+1]
-                    
+
                     # Conversion en indices (0, 1, 2...) pour Panda3D
                     idx_a = node_id_to_index[tag_a]
                     idx_b = node_id_to_index[tag_b]
-                    
+
                     edges_with_metadata.append((idx_a, idx_b, curve_tag))
 
         return points_3d, edges_with_metadata
-    
+
     def _discretize_curves(self):
         self.__synchronize()
         gmsh.model.mesh.clear()

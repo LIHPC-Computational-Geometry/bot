@@ -8,6 +8,7 @@ reste entièrement interactif. Les données transitent par un Pipe
 multiprocessing sous forme de dicts sérialisables.
 """
 
+import math
 import multiprocessing as mp
 import threading
 from typing import Callable, Optional
@@ -79,12 +80,28 @@ class Viewer:
         self._conn = None           # extrémité parent du Pipe
         self._process = None        # sous-processus Panda3D
         self._event_thread = None   # thread d'écoute des events retour
-        self.on_pick: Optional[Callable] = None
         self._running = False
+
+        self._default_last_hovered = None
+
+        self.on_pick: Optional[Callable] = None
+        self.on_hover: Optional[Callable] = self._default_on_hover
+
+
 
     # ------------------------------------------------------------------
     # API publique
     # ------------------------------------------------------------------
+
+    def highlight_curve(self, tag: str, color: list) -> "Viewer":
+        """Colore la géométrie associée à un tag."""
+        self._send('highlight_curve', {'tag': tag, 'color': color})
+        return self
+
+    def set_hud_text(self, text: str) -> "Viewer":
+        """Met à jour le texte affiché en surimpression à l'écran."""
+        self._send('update_hud', {'text': text})
+        return self
 
     def connect(self, model: Model) -> "Viewer":
         """
@@ -159,7 +176,7 @@ class Viewer:
         if self._conn is not None:
             self._conn.close()
             self._conn = None
-            
+
         self._event_thread = None
         print("Stopped Viewer")
     # ------------------------------------------------------------------
@@ -191,6 +208,8 @@ class Viewer:
                         event_type, data = self._conn.recv()
                         if event_type == 'pick' and self.on_pick is not None:
                             self.on_pick(data)
+                        elif event_type == 'hover' and self.on_hover is not None:
+                            self.on_hover(data)
                 except (EOFError, BrokenPipeError, AttributeError):
                     break
                 except Exception:
@@ -198,3 +217,48 @@ class Viewer:
 
         self._event_thread = threading.Thread(target=_listen, daemon=True)
         self._event_thread.start()
+
+    # ------------------------------------------------------------------
+    # Comportements Interactifs par Défaut
+    # ------------------------------------------------------------------
+
+    def _default_on_hover(self, tag):
+        """Comportement par défaut : met en surbrillance et affiche les détails spatiaux."""
+        if tag is not None:
+            # 1. Nettoyage de la courbe précédente
+            if self._default_last_hovered is not None and self._default_last_hovered != tag:
+                self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1])
+
+            # 2. Construction du texte d'information
+            info_text = f"--- Courbe {tag} ---\n"
+
+            if self.model is not None:
+                try:
+                    # Récupération des tags des extrémités (ex: [1, 2])
+                    tags_ext = self.model.get_end_points(int(tag))
+
+                    # Récupération des coordonnées réelles via la nouvelle fonction
+                    coords_a = self.model.get_point_coords(tags_ext[0])
+                    coords_b = self.model.get_point_coords(tags_ext[1])
+
+                    pt_a = f"({coords_a[0]:.2f}, {coords_a[1]:.2f}, {coords_a[2]:.2f})"
+                    pt_b = f"({coords_b[0]:.2f}, {coords_b[1]:.2f}, {coords_b[2]:.2f})"
+
+                    info_text += f"Type : Segment Linéaire\n"
+                    info_text += f"Extrémité A : {pt_a}\n"
+                    info_text += f"Extrémité B : {pt_b}"
+
+                except Exception as e:
+                    info_text += f"Erreur : {str(e)}"
+
+            # 3. Application visuelle
+            self.set_hud_text(info_text)
+            self.highlight_curve(tag, [1, 0.5, 0, 1])
+            self._default_last_hovered = tag
+
+        else:
+            # Gestion du vide
+            if self._default_last_hovered is not None:
+                self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1])
+                self.set_hud_text("Prêt. Survolez ou cliquez sur les courbes.")
+                self._default_last_hovered = None

@@ -1,4 +1,5 @@
 from panda3d.core import LineSegs, NodePath, LColor, Vec4, Vec3, DirectionalLight, AmbientLight
+from panda3d.core import CollisionNode, CollisionTube
 
 _DEFAULT_BOUNDS = {
     'min': [0, 0, 0], 'max': [0, 0, 0],
@@ -86,21 +87,71 @@ class Scene:
 
     def _build_from_data(self, geom_data: dict):
         """
-        Tessellate *geom_data* into a Panda3D LineSegs node.
+        Builds the 3D geometry and collision nodes from the CAD render data.
+
+        This method groups the edges by their `curve_tag`. For each distinct curve, it:
+        1. Generates the visible 3D line segments and stores the resulting
+           NodePath in `self.curve_nodes` to allow dynamic highlighting.
+        2. Generates an invisible CollisionTube around each segment, configured
+           to receive raycasts (for mouse hovering and picking) without emitting them.
+
+        Args:
+            geom_data (dict): Render data dict containing 'points' and 'edges'.
 
         Returns:
-            NodePath attached to ``render``, or ``None`` if there are no edges.
+            NodePath: The root node containing all visible and collision geometry,
+                      attached to `render`. Returns `None` if there are no edges.
         """
         points = geom_data.get('points', [])
         edges = geom_data.get('edges', [])
         if not edges:
             return None
-        lines = LineSegs()
-        lines.setThickness(self.line_thickness)
+
+        self.curve_nodes = {}
+        geom_root = self.base.render.attachNewNode("geom_root")
+
+        edges_by_tag = {}
         for e in edges:
-            lines.moveTo(points[e[0]])
-            lines.drawTo(points[e[1]])
-        return self.base.render.attachNewNode(lines.create())
+            idxA, idxB = e[0], e[1]
+            tag = str(e[2]) if len(e) > 2 else "default"
+            if tag not in edges_by_tag:
+                edges_by_tag[tag] = []
+            edges_by_tag[tag].append((idxA, idxB))
+
+        for tag, tag_edges in edges_by_tag.items():
+            lines = LineSegs()
+            lines.setThickness(self.line_thickness)
+
+            cnode = CollisionNode(f"col_{tag}")
+
+            cnode.setFromCollideMask(0)
+
+            for idxA, idxB in tag_edges:
+                ptA = points[idxA]
+                ptB = points[idxB]
+                lines.moveTo(ptA)
+                lines.drawTo(ptB)
+
+                radius = 1.0
+                tube = CollisionTube(ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius)
+                cnode.addSolid(tube)
+
+            node_path = geom_root.attachNewNode(lines.create())
+            self.curve_nodes[tag] = node_path
+
+            cnp = node_path.attachNewNode(cnode)
+            cnp.setTag('curve_tag', tag)
+
+        return geom_root
+
+    def set_curve_color(self, tag: str, color: list):
+        """Change the color of a curve."""
+        tag_str = str(tag)
+        if tag_str in self.curve_nodes:
+            node = self.curve_nodes[tag_str]
+            node.setColor(color[0], color[1], color[2], color[3], 1)
+            node.setLightOff(1)
+
 
     def rebuild(self, geom_data: dict):
         """Replace displayed geometry with new render data."""
