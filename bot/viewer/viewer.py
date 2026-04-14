@@ -222,8 +222,6 @@ class Viewer:
     # Comportements Interactifs par Défaut
     # ------------------------------------------------------------------
 
-    # Dans bot/viewer/viewer.py
-
     def _default_on_hover(self, tag):
         """Comportement par défaut : met en surbrillance et affiche les détails spatiaux."""
         if tag is not None:
@@ -243,7 +241,6 @@ class Viewer:
                     coords_a = self.model.get_point_coords(tags_ext[0])
                     coords_b = self.model.get_point_coords(tags_ext[1])
 
-                    # Formatage pour le HUD
                     pt_a = f"({coords_a[0]:.2f}, {coords_a[1]:.2f}, {coords_a[2]:.2f})"
                     pt_b = f"({coords_b[0]:.2f}, {coords_b[1]:.2f}, {coords_b[2]:.2f})"
 
@@ -256,7 +253,7 @@ class Viewer:
 
             # 3. Application visuelle
             self.set_hud_text(info_text)
-            self.highlight_curve(tag, [1, 0.5, 0, 1]) # Orange
+            self.highlight_curve(tag, [1, 0.5, 0, 1])
             self._default_last_hovered = tag
 
         else:
