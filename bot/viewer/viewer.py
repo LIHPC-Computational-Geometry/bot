@@ -234,12 +234,7 @@ class Viewer:
 
             if self.model is not None:
                 try:
-                    # Récupération des tags des extrémités (ex: [1, 2])
-                    tags_ext = self.model.get_end_points(int(tag))
-
-                    # Récupération des coordonnées réelles via la nouvelle fonction
-                    coords_a = self.model.get_point_coords(tags_ext[0])
-                    coords_b = self.model.get_point_coords(tags_ext[1])
+                    coords_a, coords_b = self.model.get_end_points_coords(int(tag))
 
                     pt_a = f"({coords_a[0]:.2f}, {coords_a[1]:.2f}, {coords_a[2]:.2f})"
                     pt_b = f"({coords_b[0]:.2f}, {coords_b[1]:.2f}, {coords_b[2]:.2f})"

@@ -259,6 +259,21 @@ class Model:
         coords = gmsh.model.getValue(0, point_tag, [])
         return list(coords)
 
+    def get_end_points_coords(self, point_tag) -> list[list[float]]:
+        """
+        Récupère les coordonnées spatiales [x, y, z] de plusieurs points géométriques.
+
+        :param points_tags: Une liste d'identifiants (tags) de points dans le modèle Gmsh.
+        :type points_tags: list[int]
+        :return: Une liste de listes de trois flottants représentant les coordonnées des points.
+        :rtype: list[list[float]]
+        """
+        tags_ext = self.get_end_points(int(point_tag))
+
+        coords_a = self.get_point_coords(tags_ext[0])
+        coords_b = self.get_point_coords(tags_ext[1])
+        return [coords_a, coords_b]
+
     def get_corners(self, face_tag):
         """
         Extracts and returns the corner points of a given face in a geometric model. The method analyzes
