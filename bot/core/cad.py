@@ -115,6 +115,14 @@ class Model:
             for i in range(len(curve_pts) - 1):
                 edges.append((start_idx + i, start_idx + i + 1, tag))
 
+            cps = curve.get_control_points()
+            cp_start_idx = len(points)
+            points.extend(cps)
+            cp_tag = f"{tag}_cp"
+
+            for i in range(len(cps) - 1):
+                edges.append((cp_start_idx + i, cp_start_idx + i + 1, cp_tag))
+        
         return {
             'points': points,
             'edges': edges,
