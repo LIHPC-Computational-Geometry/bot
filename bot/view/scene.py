@@ -129,8 +129,9 @@ class Scene:
             for idxA, idxB in tag_edges:
                 ptA = points[idxA]
                 ptB = points[idxB]
-                lines.moveTo(ptA)
-                lines.drawTo(ptB)
+                # NOTE: '*' pour décompresser la liste/tuple en 3 arguments (x, y, z) pour Panda3D
+                lines.moveTo(*ptA)
+                lines.drawTo(*ptB)
 
                 radius = 1.0
                 tube = CollisionTube(ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius)

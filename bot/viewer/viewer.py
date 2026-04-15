@@ -14,6 +14,7 @@ import threading
 from typing import Callable, Optional
 
 from bot.core.cad import Model
+from bot.core.curve import BezierCurve
 
 
 # ---------------------------------------------------------------------------
@@ -257,3 +258,24 @@ class Viewer:
                 self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1])
                 self.set_hud_text("Prêt. Survolez ou cliquez sur les courbes.")
                 self._default_last_hovered = None
+
+    def bezier_conversion(self, degree: int):
+        if self._default_last_hovered is not None:
+            tag = self._default_last_hovered
+            if self.model is not None:
+                print(self.model.get_render_data())
+                coords_a, coords_b = self.model.get_end_points_coords(int(tag))
+                control_points = BezierCurve._default_control_points(coords_a, coords_b, degree)
+                curve = BezierCurve(tag, control_points, degree)
+                self.model.set_curve(tag, curve)
+            else:
+                self.set_hud_text("Impossible to convert: no model loaded")
+        else:
+            self.set_hud_text("Impossible to convert: no curve selected")
+
+    def move_control_point(self, tag: int, cp_index: int, new_pos: list(float)):
+        if self.model is not None:
+            self.model.update_control_point(tag, cp_index, new_pos)
+            self.set_hud_text(f"Point de contrôle {cp_index} de la courbe {tag} déplacé.")
+        else:
+            self.set_hud_text("Aucun modèle chargé.")

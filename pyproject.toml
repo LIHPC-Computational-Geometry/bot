@@ -8,11 +8,16 @@ requires-python = ">=3.14"
 dependencies = [
     "gmsh>=4.15.0",
     "ipython>=9.10.0",
+    "nurbslib",
     "panda3d>=1.10.16",
 ]
 
 [tool.uv]
 package = true
+
+# FIXME: will be change, using a path like this isn't good
+[tool.uv.sources]
+nurbslib = { path = "../vtk_converter/nurbslib", editable = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -14,6 +14,15 @@ class Model:
         self.initialize()
         self._observers = []
         self.bounds = {'min': [0,0,0], 'max': [0,0,0]}
+        self.curves = {}
+
+    def set_curve(self, tag: int, curve_object):
+        """Stocke une courbe modifiée (ex: BezierCurve) et notifie l'interface."""
+        self.curves[tag] = curve_object
+        self._notify_observers()
+
+    def get_curve(self, tag: int):
+        return self.curves.get(tag)
 
     def add_observer(self, observer):
         self._observers.append(observer)
@@ -86,7 +95,26 @@ class Model:
 
     def get_render_data(self) -> dict:
         """Return all display data needed by the viewer (thread-safe, no gmsh dependency)."""
-        points, edges = self.get_curve_discretization()
+        base_points, base_edges = self.get_curve_discretization()
+
+        points = list(base_points)
+        edges = []
+
+        for edge in base_edges:
+            idx_a, idx_b, tag = edge
+            if tag not in self.curves:
+                edges.append((idx_a, idx_b, tag))
+
+        for tag, curve in self.curves.items():
+
+            curve_data = curve.get_render_data()
+            curve_pts = curve_data['curve']
+            start_idx = len(points)
+            points.extend(curve_pts)
+
+            for i in range(len(curve_pts) - 1):
+                edges.append((start_idx + i, start_idx + i + 1, tag))
+
         return {
             'points': points,
             'edges': edges,
@@ -381,3 +409,23 @@ class Model:
             surfaces.append(faces)
 
         return node_coords_3d, surfaces
+
+    def update_control_point(self, tag: int, cp_index: int, new_pt: list(float)):
+        """Met à jour un point de contrôle d'une courbe et rafraîchit l'affichage."""
+        if tag in self.curves:
+            curve = self.curves[tag]
+
+            cps = curve.get_control_points()
+
+            if 0 <= cp_index < len(cps):
+                cps[cp_index] = new_pt
+
+                degree = curve.get_degree()
+                new_curve = type(curve)(str(tag), cps, degree) # FIXME: We recreate the curve :(
+                self.curves[tag] = new_curve
+
+                self._notify_observers()
+            else:
+                print(f"Erreur : L'index {cp_index} n'existe pas. La courbe a {len(cps)} points de contrôle.")
+        else:
+            print(f"Erreur : La courbe {tag} n'est pas une courbe personnalisée.")
