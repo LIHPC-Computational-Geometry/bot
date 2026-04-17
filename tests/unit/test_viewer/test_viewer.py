@@ -220,6 +220,100 @@ class TestViewerDefaultOnHover(unittest.TestCase):
         viewer.highlight_curve.assert_any_call("3", [1, 0.5, 0, 1])
         self.assertEqual(viewer._default_last_hovered, "3")
 
+class TestViewerBezierInteractions(unittest.TestCase):
+    """Tests for Bezier curve modification interactions via the Viewer."""
+
+    def _make_viewer_with_mocks(self):
+        """Creates a Viewer with all necessary mocks."""
+        from bot.viewer.viewer import Viewer
+        viewer = Viewer()
+
+        # Mock connection and HUD text display
+        viewer._conn = MagicMock()
+        viewer.set_hud_text = MagicMock()
+
+        # Mock the model
+        viewer.model = MagicMock()
+
+        return viewer
+
+
+    @patch('bot.viewer.viewer.BezierCurve')
+    def test_bezier_conversion_success(self, MockBezierCurve):
+        """Verifies the conversion of a classic curve into a Bezier curve."""
+        viewer = self._make_viewer_with_mocks()
+
+        # State preparation
+        viewer._default_last_hovered = "42"
+        degree = 3
+        coords_a = [0.0, 0.0, 0.0]
+        coords_b = [10.0, 0.0, 0.0]
+        viewer.model.get_end_points_coords.return_value = [coords_a, coords_b]
+
+        # Mock configuration for the static method _default_control_points
+        MockBezierCurve._default_control_points.return_value = [coords_a, [3.3, 0, 0], [6.6, 0, 0], coords_b]
+
+        # Configuration of the mocked instance returned by BezierCurve(...)
+        mock_curve_instance = MagicMock()
+        MockBezierCurve.return_value = mock_curve_instance
+
+        # Method call
+        viewer.bezier_conversion(degree)
+
+        # Assertions
+        viewer.model.get_end_points_coords.assert_called_once_with(42)
+        MockBezierCurve._default_control_points.assert_called_once_with(coords_a, coords_b, degree)
+        MockBezierCurve.assert_called_once_with("42", MockBezierCurve._default_control_points.return_value, degree)
+        viewer.model.set_curve.assert_called_once_with("42", mock_curve_instance)
+
+    def test_bezier_conversion_no_selection(self):
+        """Verifies behavior if no curve is selected/hovered."""
+        viewer = self._make_viewer_with_mocks()
+        viewer._default_last_hovered = None  # No selection
+
+        viewer.bezier_conversion(3)
+
+        # Verification of the HUD error
+        viewer.set_hud_text.assert_called_once_with("Impossible to convert: no curve selected")
+        # Verifies the model was not called
+        viewer.model.get_end_points_coords.assert_not_called()
+
+    def test_bezier_conversion_no_model(self):
+        """Verifies behavior if a curve is selected but no model is connected."""
+        viewer = self._make_viewer_with_mocks()
+        viewer._default_last_hovered = "42"
+        viewer.model = None  # No model
+
+        viewer.bezier_conversion(3)
+
+        # Verification of the HUD error
+        viewer.set_hud_text.assert_called_once_with("Impossible to convert: no model loaded")
+
+
+    def test_move_control_point_success(self):
+        """Verifies that the modification of a control point is correctly transmitted to the model."""
+        viewer = self._make_viewer_with_mocks()
+
+        tag = 42
+        cp_index = 1
+        new_pos = [5.0, 10.0, 0.0]
+
+        viewer.move_control_point(tag, cp_index, new_pos)
+
+        # Verifies the model is updated
+        viewer.model.update_control_point.assert_called_once_with(tag, cp_index, new_pos)
+        # Verifies the success message in the HUD
+        viewer.set_hud_text.assert_called_once_with(f"Point de contrôle {cp_index} de la courbe {tag} déplacé.")
+
+    def test_move_control_point_no_model(self):
+        """Verifies behavior if attempting to move a point without a connected model."""
+        viewer = self._make_viewer_with_mocks()
+        viewer.model = None  # No model
+
+        viewer.move_control_point(42, 1, [0, 0, 0])
+
+        # Verification of the HUD error
+        viewer.set_hud_text.assert_called_once_with("Aucun modèle chargé.")
 
 if __name__ == '__main__':
     unittest.main()
