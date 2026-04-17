@@ -172,25 +172,6 @@ class TestViewerDefaultOnHover(unittest.TestCase):
 
         return viewer
 
-    def test_default_on_hover_valid_tag(self):
-        viewer = self._make_viewer_with_mocks()
-
-        viewer.model.get_end_points.return_value = [10, 20]
-        viewer.model.get_point_coords.side_effect = lambda tag: [0.0, 0.0, 0.0] if tag == 10 else [1.0, 1.0, 1.0]
-
-        viewer._default_on_hover("1")
-
-        viewer.model.get_end_points.assert_called_once_with(1)
-        viewer.highlight_curve.assert_called_once_with("1", [1, 0.5, 0, 1])
-
-        args, _ = viewer.set_hud_text.call_args
-        texte_affiche = args[0]
-        self.assertIn("Courbe 1", texte_affiche)
-        self.assertIn("(0.00, 0.00, 0.00)", texte_affiche)
-        self.assertIn("(1.00, 1.00, 1.00)", texte_affiche)
-
-        self.assertEqual(viewer._default_last_hovered, "1")
-
     def test_default_on_hover_empty_space(self):
         viewer = self._make_viewer_with_mocks()
         viewer._default_last_hovered = "2"
@@ -201,18 +182,6 @@ class TestViewerDefaultOnHover(unittest.TestCase):
         viewer.set_hud_text.assert_called_once_with("Prêt. Survolez ou cliquez sur les courbes.")
         self.assertIsNone(viewer._default_last_hovered)
 
-    def test_default_on_hover_change_curve(self):
-        viewer = self._make_viewer_with_mocks()
-        viewer._default_last_hovered = "1"
-        viewer.model.get_end_points.return_value = [10, 20]
-        viewer.model.get_point_coords.return_value = [0.0, 0.0, 0.0]
-
-        viewer._default_on_hover("3")
-
-        viewer.highlight_curve.assert_any_call("1", [1, 1, 1, 1])
-        viewer.highlight_curve.assert_any_call("3", [1, 0.5, 0, 1])
-        self.assertEqual(viewer._default_last_hovered, "3")
-
     def test_default_on_hover_invalid_tag(self):
         viewer = self._make_viewer_with_mocks()
         viewer._default_on_hover("tag_bizarre")
@@ -220,6 +189,36 @@ class TestViewerDefaultOnHover(unittest.TestCase):
 
         args, _ = viewer.set_hud_text.call_args
         self.assertIn("invalid literal", args[0])
+
+    def test_default_on_hover_valid_tag(self):
+        viewer = self._make_viewer_with_mocks()
+
+        viewer.model.get_end_points_coords.return_value = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
+
+        viewer._default_on_hover("1")
+
+        viewer.model.get_end_points_coords.assert_called_once_with(1)
+        viewer.highlight_curve.assert_called_once_with("1", [1, 0.5, 0, 1])
+
+        args, _ = viewer.set_hud_text.call_args
+        texte_affiche = args[0]
+        self.assertIn("Courbe 1", texte_affiche)
+        self.assertIn("(0.00, 0.00, 0.00)", texte_affiche)
+        self.assertIn("(1.00, 1.00, 1.00)", texte_affiche)
+
+        self.assertEqual(viewer._default_last_hovered, "1")
+
+    def test_default_on_hover_change_curve(self):
+        viewer = self._make_viewer_with_mocks()
+        viewer._default_last_hovered = "1"
+
+        viewer.model.get_end_points_coords.return_value = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
+
+        viewer._default_on_hover("3")
+
+        viewer.highlight_curve.assert_any_call("1", [1, 1, 1, 1])
+        viewer.highlight_curve.assert_any_call("3", [1, 0.5, 0, 1])
+        self.assertEqual(viewer._default_last_hovered, "3")
 
 
 if __name__ == '__main__':
