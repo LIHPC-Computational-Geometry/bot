@@ -8,6 +8,7 @@ class BezierCurve:
         self.tag = tag
         self._engine = nurbslib.PyBezierCurve(degree, control_points, None)
 
+    @staticmethod
     def _default_control_points(coords_a, coords_b, degree=3):
         """
         Génère les points de contrôle par défaut pour une courbe de Bézier.
