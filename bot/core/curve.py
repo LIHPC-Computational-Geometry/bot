@@ -2,7 +2,7 @@ import nurbslib
 
 class BezierCurve:
     """
-    Cette classe agit comme un pont entre ta géométrie actuelle et la lib Rust.
+    This class acts as a bridge between your current geometry and the Rust lib.
     """
     def __init__(self, tag: str, control_points: list[list[float]], degree: int):
         self.tag = tag
@@ -11,8 +11,8 @@ class BezierCurve:
     @staticmethod
     def _default_control_points(coords_a, coords_b, degree=3):
         """
-        Génère les points de contrôle par défaut pour une courbe de Bézier.
-        Les points sont répartis uniformément le long du segment reliant coords_a à coords_b.
+        Generates the default control points for a Bezier curve.
+        The points are evenly distributed along the segment connecting coords_a to coords_b.
         """
         points = []
 
@@ -24,8 +24,8 @@ class BezierCurve:
         for i in range(num_points):
             t = i / degree
 
-            # Interpolation linéaire (lerp) pour chaque axe (x, y, z)
-            # Formule mathématique : point = A + (B - A) * t
+            # Linear interpolation (lerp) for each axis (x, y, z)
+            # Mathematical formula: point = A + (B - A) * t
             current_point = [
                 a + (b - a) * t
                 for a, b in zip(coords_a, coords_b)

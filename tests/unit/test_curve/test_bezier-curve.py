@@ -14,38 +14,38 @@ class TestBezierCurve(unittest.TestCase):
 
     @patch('bot.core.curve.nurbslib')
     def test_initialization_and_attributes(self, mock_nurbslib):
-        """Test l'initialisation de la courbe et l'accès à ses attributs de base."""
-        # 1. Préparation des données
+        """Tests the initialization of the curve and access to its basic attributes."""
+        # 1. Data preparation
         tag = "curve_1"
         control_points = [[0.0, 0.0, 0.0], [5.0, 5.0, 0.0], [10.0, 0.0, 0.0]]
         degree = 2
 
-        # 2. Configuration du mock pour simuler le moteur nurbslib
+        # 2. Mock configuration to simulate the nurbslib engine
         mock_engine_instance = MagicMock()
         mock_engine_instance.get_control_points.return_value = control_points
         mock_engine_instance.get_degree.return_value = degree
         mock_nurbslib.PyBezierCurve.return_value = mock_engine_instance
 
-        # 3. Création de l'objet
+        # 3. Object creation
         curve = BezierCurve(tag, control_points, degree)
 
-        # 4. Vérifications (Assertions)
+        # 4. Verifications (Assertions)
         self.assertEqual(curve.get_tag(), "curve_1")
         self.assertEqual(curve.get_control_points(), control_points)
         self.assertEqual(curve.get_degree(), degree)
 
-        # On s'assure que le moteur Rust a bien été appelé avec les bons arguments
+        # Ensure the Rust engine was called with the correct arguments
         mock_nurbslib.PyBezierCurve.assert_called_once_with(degree, control_points, None)
 
     def test_default_control_points_default_degree(self):
-        """Test que la méthode utilise bien le degré 3 par défaut si non précisé."""
+        """Tests that the method uses default degree 3 if not specified."""
         coords_a = [0.0, 0.0, 0.0]
         coords_b = [30.0, 0.0, 0.0]
 
-        # Appel SANS spécifier le degré
+        # Call WITHOUT specifying the degree
         pts = BezierCurve._default_control_points(coords_a, coords_b)
 
-        # Le degré par défaut étant 3, on s'attend à 3 + 1 = 4 points
+        # Since the default degree is 3, we expect 3 + 1 = 4 points
         expected_pts = [
             [0.0, 0.0, 0.0],
             [10.0, 0.0, 0.0],
@@ -56,15 +56,15 @@ class TestBezierCurve(unittest.TestCase):
         self.assertEqual(pts, expected_pts)
 
     def test_default_control_points_distribution(self):
-        """Test la répartition spatiale uniforme des points générés par défaut."""
+        """Tests the uniform spatial distribution of the default generated points."""
         coords_a = [0.0, 0.0, 0.0]
         coords_b = [10.0, 0.0, 0.0]
         degree = 2
 
-        # Exécution de la méthode statique
+        # Execute static method
         pts = BezierCurve._default_control_points(coords_a, coords_b, degree)
 
-        # On s'attend à 3 points : le point A, le point milieu, et le point B
+        # We expect 3 points: point A, middle point, and point B
         expected_pts = [
             [0.0, 0.0, 0.0],
             [5.0, 0.0, 0.0],
@@ -73,60 +73,60 @@ class TestBezierCurve(unittest.TestCase):
         self.assertEqual(pts, expected_pts)
 
     def test_default_control_points_count(self):
-        """Test que le nombre de points générés correspond toujours au degré + 1."""
+        """Tests that the number of generated points always corresponds to degree + 1."""
         coords_a = [0.0, 0.0, 0.0]
         coords_b = [10.0, 10.0, 10.0]
 
-        # On vérifie pour plusieurs degrés différents
+        # We check for several different degrees
         for degree in [1, 3, 5, 10]:
             pts = BezierCurve._default_control_points(coords_a, coords_b, degree)
             self.assertEqual(len(pts), degree + 1)
 
     def test_default_control_points_degree_zero(self):
-        """Test le cas limite où le degré de la courbe est 0."""
+        """Tests the edge case where the curve degree is 0."""
         coords_a = [1.0, 2.0, 3.0]
         coords_b = [4.0, 5.0, 6.0]
 
         pts = BezierCurve._default_control_points(coords_a, coords_b, degree=0)
 
-        # Pour un degré 0, il ne doit y avoir qu'un seul point (le point A)
+        # For degree 0, there must be only one point (point A)
         self.assertEqual(len(pts), 1)
         self.assertEqual(pts[0], coords_a)
 
     @patch('bot.core.curve.nurbslib')
     def test_get_render_data(self, mock_nurbslib):
-        """Test la structure et le contenu du dictionnaire de rendu (utilisé par le viewer)."""
+        """Tests the structure and content of the render dictionary (used by the viewer)."""
         tag = "42"
         control_points = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
         degree = 1
 
-        # Résultat simulé de l'évaluation de la courbe par le moteur
+        # Simulated result of curve evaluation by the engine
         mock_curve_eval = [[0.0, 0.0, 0.0], [0.5, 0.5, 0.5], [1.0, 1.0, 1.0]]
 
-        # Configuration du mock
+        # Mock configuration
         mock_engine_instance = MagicMock()
         mock_engine_instance.get_control_points.return_value = control_points
         mock_engine_instance.get_degree.return_value = degree
         mock_engine_instance.evaluate.return_value = mock_curve_eval
         mock_nurbslib.PyBezierCurve.return_value = mock_engine_instance
 
-        # Création et récupération des données
+        # Object creation and data retrieval
         curve = BezierCurve(tag, control_points, degree)
         data = curve.get_render_data()
 
-        # Vérification de la présence de toutes les clés nécessaires
+        # Verification of the presence of all required keys
         self.assertIn('tag', data)
         self.assertIn('control_points', data)
         self.assertIn('degree', data)
         self.assertIn('curve', data)
 
-        # Vérification des valeurs
+        # Verifications of values
         self.assertEqual(data['tag'], "42")
         self.assertEqual(data['control_points'], control_points)
         self.assertEqual(data['degree'], degree)
         self.assertEqual(data['curve'], mock_curve_eval)
 
-        # Vérification que le moteur a bien été sollicité pour générer 100 points
+        # Ensure the engine was called to generate 100 points
         mock_engine_instance.evaluate.assert_called_once_with(100, False)
 
 

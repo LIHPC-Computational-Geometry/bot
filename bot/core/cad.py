@@ -297,11 +297,11 @@ class Model:
 
     def get_end_points_coords(self, point_tag) -> list[list[float]]:
         """
-        Récupère les coordonnées spatiales [x, y, z] de plusieurs points géométriques.
+        Retrieves the spatial coordinates [x, y, z] of the two endpoints of a given curve.
 
-        :param points_tags: Une liste d'identifiants (tags) de points dans le modèle Gmsh.
-        :type points_tags: list[int]
-        :return: Une liste de listes de trois flottants représentant les coordonnées des points.
+        :param point_tag: The tag (identifier) of the curve in the Gmsh model.
+        :type point_tag: int or str
+        :return: A list containing two lists of three floats representing the coordinates of the two endpoints.
         :rtype: list[list[float]]
         """
         tags_ext = self.get_end_points(int(point_tag))
