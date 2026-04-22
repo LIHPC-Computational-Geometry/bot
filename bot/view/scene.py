@@ -85,6 +85,45 @@ class Scene:
         """Bounding-box data of the current geometry (center, size, min, max)."""
         return self._geom_data.get('bounds', _DEFAULT_BOUNDS)
 
+    def _group_edges_by_tag(self, edges: list) -> dict:
+        """Groups a list of edges by their curve tag."""
+        edges_by_tag = {}
+        for e in edges:
+            idxA, idxB = e[0], e[1]
+            tag = str(e[2]) if len(e) > 2 else "default"
+            if tag not in edges_by_tag:
+                edges_by_tag[tag] = []
+            edges_by_tag[tag].append((idxA, idxB))
+        return edges_by_tag
+
+    def _create_curve_geometry(self, tag: str, tag_edges: list, points: list):
+        """Creates the visible lines and invisible collision nodes for a set of edges."""
+        lines = LineSegs()
+        is_control_polygon = tag.endswith('_cp')
+
+        if is_control_polygon:
+            lines.setThickness(1.0)
+            lines.setColor(0.5, 0.5, 0.5, 1)
+        else:
+            lines.setThickness(self.line_thickness)
+
+        cnode = CollisionNode(f"col_{tag}")
+        cnode.setFromCollideMask(0)
+
+        for idxA, idxB in tag_edges:
+            ptA = points[idxA]
+            ptB = points[idxB]
+            # NOTE: '*' pour décompresser la liste/tuple en 3 arguments (x, y, z) pour Panda3D
+            lines.moveTo(*ptA)
+            lines.drawTo(*ptB)
+
+            if not is_control_polygon:
+                radius = 1.0
+                tube = CollisionTube(ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius)
+                cnode.addSolid(tube)
+
+        return lines, cnode, is_control_polygon
+
     def _build_from_data(self, geom_data: dict):
         """
         Builds the 3D geometry and collision nodes from the CAD render data.
@@ -110,39 +149,10 @@ class Scene:
         self.curve_nodes = {}
         geom_root = self.base.render.attachNewNode("geom_root")
 
-        edges_by_tag = {}
-        for e in edges:
-            idxA, idxB = e[0], e[1]
-            tag = str(e[2]) if len(e) > 2 else "default"
-            if tag not in edges_by_tag:
-                edges_by_tag[tag] = []
-            edges_by_tag[tag].append((idxA, idxB))
+        edges_by_tag = self._group_edges_by_tag(edges)
 
         for tag, tag_edges in edges_by_tag.items():
-            lines = LineSegs()
-            is_control_polygon = tag.endswith('_cp')
-
-            if is_control_polygon:
-                lines.setThickness(1.0)
-                lines.setColor(0.5, 0.5, 0.5, 1)
-            else:
-                lines.setThickness(self.line_thickness)
-
-            cnode = CollisionNode(f"col_{tag}")
-
-            cnode.setFromCollideMask(0)
-
-            for idxA, idxB in tag_edges:
-                ptA = points[idxA]
-                ptB = points[idxB]
-                # NOTE: '*' pour décompresser la liste/tuple en 3 arguments (x, y, z) pour Panda3D
-                lines.moveTo(*ptA)
-                lines.drawTo(*ptB)
-
-                if not is_control_polygon:
-                    radius = 1.0
-                    tube = CollisionTube(ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius)
-                    cnode.addSolid(tube)
+            lines, cnode, is_control_polygon = self._create_curve_geometry(tag, tag_edges, points)
 
             node_path = geom_root.attachNewNode(lines.create())
             self.curve_nodes[tag] = node_path
