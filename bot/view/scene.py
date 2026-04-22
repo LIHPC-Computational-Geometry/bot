@@ -1,5 +1,6 @@
 from panda3d.core import LineSegs, NodePath, LColor, Vec4, Vec3, DirectionalLight, AmbientLight
 from panda3d.core import CollisionNode, CollisionTube
+from panda3d.core import GeomVertexFormat, GeomVertexData, Geom, GeomPoints, GeomNode, GeomVertexWriter
 
 _DEFAULT_BOUNDS = {
     'min': [0, 0, 0], 'max': [0, 0, 0],
@@ -86,7 +87,9 @@ class Scene:
         return self._geom_data.get('bounds', _DEFAULT_BOUNDS)
 
     def _group_edges_by_tag(self, edges: list) -> dict:
-        """Groups a list of edges by their curve tag."""
+        # NOTE: A curve is a liste of small edges. This function group all these edges for set the same color
+        """Groups a list of edges by their curve tag.
+        """
         edges_by_tag = {}
         for e in edges:
             idxA, idxB = e[0], e[1]
@@ -122,7 +125,13 @@ class Scene:
                 tube = CollisionTube(ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius)
                 cnode.addSolid(tube)
 
-        return lines, cnode, is_control_polygon
+        if is_control_polygon:
+            unique_indices = dict.fromkeys(idx for edge in tag_edges for idx in edge)
+            extremities = [points[idx] for idx in unique_indices]
+        else:
+            extremities = []
+
+        return lines, cnode, is_control_polygon, extremities
 
     def _build_from_data(self, geom_data: dict):
         """
@@ -152,10 +161,37 @@ class Scene:
         edges_by_tag = self._group_edges_by_tag(edges)
 
         for tag, tag_edges in edges_by_tag.items():
-            lines, cnode, is_control_polygon = self._create_curve_geometry(tag, tag_edges, points)
+            lines, cnode, is_control_polygon, extremities = self._create_curve_geometry(tag, tag_edges, points)
 
             node_path = geom_root.attachNewNode(lines.create())
             self.curve_nodes[tag] = node_path
+
+            if is_control_polygon and extremities:
+                format = GeomVertexFormat.getV3()
+                # NOTE: correspond à l'espace mémoire utilisé pour stocker les points 3D
+                vdata = GeomVertexData('anchors', format, Geom.UHDynamic)
+                # NOTE: permet d'écrire dans l'espace mémoire vdata dans la 'colonne' nommé 'vertex'
+                vertex = GeomVertexWriter(vdata, 'vertex')
+                # NOTE: Permet de dire au GPU de traiter les coordonnée en tant que point flottant (on pourrait très bien utiliser GeomTriangles(Geom.UHDynamic) pour dessiner des surffaces)
+                prim = GeomPoints(Geom.UHDynamic)
+
+                for i, pt in enumerate(extremities):
+                    vertex.addData3f(*pt)
+                    prim.addVertex(i)
+
+                prim.closePrimitive()
+                # NOTE: relie les données vdata avec les instructions à respecter sur ces données
+                geom = Geom(vdata)
+                geom.addPrimitive(prim)
+                # NOTE: Emballe le Geom pour être lisible par le moteur 3D
+                gnode = GeomNode(f'anchors_{tag}')
+                gnode.addGeom(geom)
+
+                pts_np = node_path.attachNewNode(gnode)
+                pts_np.setRenderModeThickness(10)
+
+                node_path.setColor(0.5, 0.5, 0.5, 1, 1)
+                node_path.setLightOff(1)
 
             if is_control_polygon:
                 node_path.hide()
