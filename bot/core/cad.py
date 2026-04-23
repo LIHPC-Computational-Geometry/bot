@@ -95,37 +95,58 @@ class Model:
 
     def get_render_data(self) -> dict:
         """Return all display data needed by the viewer (thread-safe, no gmsh dependency)."""
-        base_points, base_edges = self.get_curve_discretization()
+        curves_data = {}
 
-        points = list(base_points)
-        edges = []
+        node_tags, coords, _ = gmsh.model.mesh.getNodes()
+        node_id_to_coords = {
+            tag: (coords[i*3], coords[i*3+1], coords[i*3+2])
+            for i, tag in enumerate(node_tags)
+        }
 
-        for edge in base_edges:
-            idx_a, idx_b, tag = edge
-            if tag not in self.curves:
-                edges.append((idx_a, idx_b, tag))
+        for entity in gmsh.model.getEntities(1):
+            tag = entity[1]
+            _, _, node_tags_per_elem = gmsh.model.mesh.getElements(1, tag)
 
-        for tag, curve in self.curves.items():
+            if not node_tags_per_elem:
+                continue
 
-            curve_data = curve.get_render_data()
-            curve_pts = curve_data['curve']
-            start_idx = len(points)
-            points.extend(curve_pts)
+            connectivity = node_tags_per_elem[0]
 
-            for i in range(len(curve_pts) - 1):
-                edges.append((start_idx + i, start_idx + i + 1, tag))
+            # Index local à cette courbe
+            seen = {}
+            local_points = []
+            local_edges = []
 
-            cps = curve.get_control_points()
-            cp_start_idx = len(points)
-            points.extend(cps)
-            cp_tag = f"{tag}_cp"
+            for i in range(0, len(connectivity), 2):
+                for node_tag in (connectivity[i], connectivity[i+1]):
+                    if node_tag not in seen:
+                        seen[node_tag] = len(local_points)
+                        local_points.append(node_id_to_coords[node_tag])
+                local_edges.append((seen[connectivity[i]], seen[connectivity[i+1]]))
 
-            for i in range(len(cps) - 1):
-                edges.append((cp_start_idx + i, cp_start_idx + i + 1, cp_tag))
-        
+            curve_entry = {
+                'points': local_points,
+                'edges': local_edges,
+                'type': 'linear',
+            }
+
+            # Surcharge si courbe paramétrique connue
+            if tag in self.curves:
+                custom = self.curves[tag]
+                render = custom.get_render_data()
+                curve_entry.update({
+                    'type': 'bezier',
+                    'degree': render['degree'],
+                    'control_points': render['control_points'],
+                    'cp_edges': [(i, i+1) for i in range(len(render['control_points'])-1)],
+                    'points': render['curve'],   # écrase les pts gmsh
+                    'edges': [(i, i+1) for i in range(len(render['curve'])-1)],
+                })
+
+            curves_data[str(tag)] = curve_entry
+
         return {
-            'points': points,
-            'edges': edges,
+            'curves': curves_data,
             'bounds': dict(self.bounds),
         }
 

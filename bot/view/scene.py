@@ -2,6 +2,8 @@ from panda3d.core import LineSegs, NodePath, LColor, Vec4, Vec3, DirectionalLigh
 from panda3d.core import CollisionNode, CollisionTube
 from panda3d.core import GeomVertexFormat, GeomVertexData, Geom, GeomPoints, GeomNode, GeomVertexWriter
 
+from bot.view.curve_app import CurveApp
+
 _DEFAULT_BOUNDS = {
     'min': [0, 0, 0], 'max': [0, 0, 0],
     'center': [0, 0, 0], 'size': [1, 1, 1],
@@ -80,6 +82,7 @@ class Scene:
         self.geom_node = self._build_from_data(geom_data)
         self.gizmo = Gizmo(self.base.pixel2d)
         self.add_lighting()
+        self.curves = {}
 
     @property
     def bounds(self) -> dict:
@@ -150,72 +153,33 @@ class Scene:
             NodePath: The root node containing all visible and collision geometry,
                       attached to `render`. Returns `None` if there are no edges.
         """
-        points = geom_data.get('points', [])
-        edges = geom_data.get('edges', [])
-        if not edges:
-            return None
+        curves = geom_data.get('curves', [])
 
-        self.curve_nodes = {}
+        self.curves = {}
+
+        for tag, curve in curves.items():
+            self.curves[int(tag)] = CurveApp(tag, curve)
         geom_root = self.base.render.attachNewNode("geom_root")
 
-        edges_by_tag = self._group_edges_by_tag(edges)
-
-        for tag, tag_edges in edges_by_tag.items():
-            lines, cnode, is_control_polygon, extremities = self._create_curve_geometry(tag, tag_edges, points)
-
+        for tag, curve in self.curves.items():
+            lines = self.curves[tag].create_curve_geometry(self.line_thickness)
             node_path = geom_root.attachNewNode(lines.create())
-            self.curve_nodes[tag] = node_path
-
-            if is_control_polygon and extremities:
-                format = GeomVertexFormat.getV3()
-                # NOTE: correspond à l'espace mémoire utilisé pour stocker les points 3D
-                vdata = GeomVertexData('anchors', format, Geom.UHDynamic)
-                # NOTE: permet d'écrire dans l'espace mémoire vdata dans la 'colonne' nommé 'vertex'
-                vertex = GeomVertexWriter(vdata, 'vertex')
-                # NOTE: Permet de dire au GPU de traiter les coordonnée en tant que point flottant (on pourrait très bien utiliser GeomTriangles(Geom.UHDynamic) pour dessiner des surffaces)
-                prim = GeomPoints(Geom.UHDynamic)
-
-                for i, pt in enumerate(extremities):
-                    vertex.addData3f(*pt)
-                    prim.addVertex(i)
-
-                prim.closePrimitive()
-                # NOTE: relie les données vdata avec les instructions à respecter sur ces données
-                geom = Geom(vdata)
-                geom.addPrimitive(prim)
-                # NOTE: Emballe le Geom pour être lisible par le moteur 3D
-                gnode = GeomNode(f'anchors_{tag}')
-                gnode.addGeom(geom)
-
-                pts_np = node_path.attachNewNode(gnode)
-                pts_np.setRenderModeThickness(10)
-
-                node_path.setColor(0.5, 0.5, 0.5, 1, 1)
-                node_path.setLightOff(1)
-
-            if is_control_polygon:
-                node_path.hide()
-
-            cnp = node_path.attachNewNode(cnode)
-            cnp.setTag('curve_tag', tag)
-
+            curve.attachCuveNode(node_path)
         return geom_root
 
     def set_curve_color(self, tag: str, color: list):
         """Change the color of a curve."""
-        tag_str = str(tag)
-        if tag_str in self.curve_nodes:
-            node = self.curve_nodes[tag_str]
-            node.setColor(color[0], color[1], color[2], color[3], 1)
-            node.setLightOff(1)
+        curve = None
+        if tag in self.curves:
+            curve = self.curves[tag]
+        else:
+            try:
+                curve = self.curves.get(int(tag))
+            except (TypeError, ValueError):
+                curve = None
 
-            cp_tag = f"{tag_str}_cp"
-            if cp_tag in self.curve_nodes:
-                if color[:3] == [1.0, 1.0, 1.0]:
-                    self.curve_nodes[cp_tag].hide()
-                else:
-                    self.curve_nodes[cp_tag].show()
-
+        if curve is not None:
+            curve.set_color(color)
 
 
     def rebuild(self, geom_data: dict):

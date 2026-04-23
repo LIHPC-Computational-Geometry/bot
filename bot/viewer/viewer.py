@@ -225,9 +225,9 @@ class Viewer:
 
     def _default_on_hover(self, tag):
         """Default behavior: highlights and displays spatial details."""
-        if tag is not None:
+        if tag:
             # 1. Cleanup of the previous curve
-            if self._default_last_hovered is not None and self._default_last_hovered != tag:
+            if self._default_last_hovered and self._default_last_hovered != tag:
                 self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1])
 
             # 2. Building the information text
@@ -254,7 +254,7 @@ class Viewer:
 
         else:
             # Handle empty selection
-            if self._default_last_hovered is not None:
+            if self._default_last_hovered:
                 self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1])
                 self.set_hud_text("Ready. Hover or click on the curves.")
                 self._default_last_hovered = None
