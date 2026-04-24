@@ -315,5 +315,44 @@ class TestViewerBezierInteractions(unittest.TestCase):
         # Verification of the HUD error
         viewer.set_hud_text.assert_called_once_with("Aucun modèle chargé.")
 
+
+class TestViewerCurveEditMode(unittest.TestCase):
+
+    def _make_viewer(self):
+        from bot.viewer.viewer import Viewer
+        viewer = Viewer()
+        viewer._conn = MagicMock()
+        return viewer
+
+    def test_set_edit_mode_sends_command(self):
+        viewer = self._make_viewer()
+        viewer.set_edit_mode(True, 7)
+        viewer._conn.send.assert_called_with(('set_edit_mode', {'enabled': True, 'curve_tag': 7}))
+
+    def test_set_active_curve_sends_command(self):
+        viewer = self._make_viewer()
+        viewer.set_active_curve(9)
+        viewer._conn.send.assert_called_with(('set_active_curve', {'curve_tag': 9}))
+
+    def test_default_on_curve_selected_enables_edit_mode(self):
+        viewer = self._make_viewer()
+        viewer.set_edit_mode = MagicMock()
+        viewer.set_active_curve = MagicMock()
+        viewer.set_hud_text = MagicMock()
+
+        viewer._default_on_curve_selected("5")
+
+        viewer.set_edit_mode.assert_called_once_with(True, 5)
+        viewer.set_active_curve.assert_called_once_with(5)
+        viewer.set_hud_text.assert_called_once()
+
+    def test_default_on_cp_pick_end_commits_to_model(self):
+        viewer = self._make_viewer()
+        viewer.model = MagicMock()
+
+        viewer._default_on_cp_pick_end({'tag': '4', 'cp_index': 2, 'world_pos': [1.0, 2.0, 3.0]})
+
+        viewer.model.update_control_point.assert_called_once_with(4, 2, [1.0, 2.0, 3.0])
+
 if __name__ == '__main__':
     unittest.main()

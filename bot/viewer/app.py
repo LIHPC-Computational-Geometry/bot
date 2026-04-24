@@ -113,6 +113,19 @@ class ViewerApp(ShowBase):
                         self._scene.set_curve_color(data['tag'], data['color'])
                 elif cmd == 'update_hud':
                     self.hud.setText(data['text'])
+                elif cmd == 'set_edit_mode':
+                    enabled = bool(data.get('enabled', False))
+                    curve_tag = data.get('curve_tag')
+                    self.mouse_handler.set_edit_mode(enabled, curve_tag)
+                    if self._scene:
+                        self._scene.set_edit_mode(enabled)
+                        if curve_tag is not None:
+                            self._scene.set_active_curve(curve_tag)
+                elif cmd == 'set_active_curve':
+                    curve_tag = data.get('curve_tag')
+                    self.mouse_handler.set_edit_mode(self.mouse_handler.edit_mode_enabled, curve_tag)
+                    if self._scene:
+                        self._scene.set_active_curve(curve_tag)
             except queue.Empty:
                 break
         return task.cont

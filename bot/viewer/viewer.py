@@ -11,10 +11,14 @@ in the form of serializable dicts.
 import math
 import multiprocessing as mp
 import threading
-from typing import Callable, Optional
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
-from bot.core.cad import Model
 from bot.core.curve import BezierCurve
+
+if TYPE_CHECKING:
+    from bot.core.cad import Model
+else:
+    Model = Any
 
 
 # ---------------------------------------------------------------------------
@@ -87,6 +91,10 @@ class Viewer:
 
         self.on_pick: Optional[Callable] = None
         self.on_hover: Optional[Callable] = self._default_on_hover
+        self.on_curve_selected: Optional[Callable] = self._default_on_curve_selected
+        self.on_cp_pick_start: Optional[Callable] = None
+        self.on_cp_drag: Optional[Callable] = None
+        self.on_cp_pick_end: Optional[Callable] = self._default_on_cp_pick_end
 
 
 
@@ -102,6 +110,14 @@ class Viewer:
     def set_hud_text(self, text: str) -> "Viewer":
         """Updates the text displayed in an overlay on the screen."""
         self._send('update_hud', {'text': text})
+        return self
+
+    def set_edit_mode(self, enabled: bool, curve_tag: Optional[int] = None) -> "Viewer":
+        self._send('set_edit_mode', {'enabled': enabled, 'curve_tag': curve_tag})
+        return self
+
+    def set_active_curve(self, curve_tag: Optional[int]) -> "Viewer":
+        self._send('set_active_curve', {'curve_tag': curve_tag})
         return self
 
     def connect(self, model: Model) -> "Viewer":
@@ -211,6 +227,14 @@ class Viewer:
                             self.on_pick(data)
                         elif event_type == 'hover' and self.on_hover is not None:
                             self.on_hover(data)
+                        elif event_type == 'curve_selected' and self.on_curve_selected is not None:
+                            self.on_curve_selected(data)
+                        elif event_type == 'cp_pick_start' and self.on_cp_pick_start is not None:
+                            self.on_cp_pick_start(data)
+                        elif event_type == 'cp_drag' and self.on_cp_drag is not None:
+                            self.on_cp_drag(data)
+                        elif event_type == 'cp_pick_end' and self.on_cp_pick_end is not None:
+                            self.on_cp_pick_end(data)
                 except (EOFError, BrokenPipeError, AttributeError):
                     break
                 except Exception:
@@ -231,7 +255,7 @@ class Viewer:
                 self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1])
 
             # 2. Building the information text
-            info_text = f"--- Curve {tag} ---\n"
+            info_text = f"--- Courbe {tag} ---\n"
 
             if self.model is not None:
                 try:
@@ -240,12 +264,12 @@ class Viewer:
                     pt_a = f"({coords_a[0]:.2f}, {coords_a[1]:.2f}, {coords_a[2]:.2f})"
                     pt_b = f"({coords_b[0]:.2f}, {coords_b[1]:.2f}, {coords_b[2]:.2f})"
 
-                    info_text += f"Type: Linear Segment\n"
-                    info_text += f"End A: {pt_a}\n"
-                    info_text += f"End B: {pt_b}"
+                    info_text += f"Type: Segment linéaire\n"
+                    info_text += f"Extrémité A: {pt_a}\n"
+                    info_text += f"Extrémité B: {pt_b}"
 
                 except Exception as e:
-                    info_text += f"Error: {str(e)}"
+                    info_text += f"Erreur: {str(e)}"
 
             # 3. Visual application
             self.set_hud_text(info_text)
@@ -256,8 +280,32 @@ class Viewer:
             # Handle empty selection
             if self._default_last_hovered:
                 self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1])
-                self.set_hud_text("Ready. Hover or click on the curves.")
+                self.set_hud_text("Prêt. Survolez ou cliquez sur les courbes.")
                 self._default_last_hovered = None
+
+    def _default_on_curve_selected(self, tag):
+        if tag is None:
+            return
+        try:
+            normalized = int(tag)
+        except (TypeError, ValueError):
+            return
+        self.set_edit_mode(True, normalized)
+        self.set_active_curve(normalized)
+        self.set_hud_text(f"Editing curve {normalized}: drag a control point.")
+
+    def _default_on_cp_pick_end(self, data):
+        if self.model is None or data is None:
+            return
+        try:
+            tag = int(data['tag'])
+            cp_index = int(data['cp_index'])
+            world_pos = data.get('world_pos')
+            if world_pos is None:
+                return
+            self.model.update_control_point(tag, cp_index, world_pos)
+        except Exception as e:
+            self.set_hud_text(f"Control point update failed: {e}")
 
     def bezier_conversion(self, degree: int):
         if self._default_last_hovered is not None:
@@ -273,9 +321,9 @@ class Viewer:
         else:
             self.set_hud_text("Impossible to convert: no curve selected")
 
-    def move_control_point(self, tag: int, cp_index: int, new_pos: list(float)):
+    def move_control_point(self, tag: int, cp_index: int, new_pos: list[float]):
         if self.model is not None:
             self.model.update_control_point(tag, cp_index, new_pos)
-            self.set_hud_text(f"Control point {cp_index} of curve {tag} moved.")
+            self.set_hud_text(f"Point de contrôle {cp_index} de la courbe {tag} déplacé.")
         else:
-            self.set_hud_text("No model loaded.")
+            self.set_hud_text("Aucun modèle chargé.")

@@ -44,6 +44,10 @@ class BezierCurve:
     def get_degree(self):
         return self._engine.get_degree()
 
+    def set_control_points(self, control_points: list[list[float]]):
+        """Replace the internal curve engine with updated control points."""
+        self._engine = nurbslib.PyBezierCurve(self.get_degree(), control_points, None)
+
     def get_render_data(self) -> dict:
         return {
             'tag': self.tag,

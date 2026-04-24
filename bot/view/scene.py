@@ -78,11 +78,13 @@ class Scene:
         self.background_color = settings.get('background_color', [0.1, 0.1, 0.12])
         self.base.set_background_color(self.background_color)
         self.line_thickness = settings.get('line_thickness', 2)
+        self.curves = {}
+        self.active_curve_tag = None
+        self.edit_mode_enabled = False
 
         self.geom_node = self._build_from_data(geom_data)
         self.gizmo = Gizmo(self.base.pixel2d)
         self.add_lighting()
-        self.curves = {}
 
     @property
     def bounds(self) -> dict:
@@ -162,9 +164,12 @@ class Scene:
         geom_root = self.base.render.attachNewNode("geom_root")
 
         for tag, curve in self.curves.items():
-            lines = self.curves[tag].create_curve_geometry(self.line_thickness)
-            node_path = geom_root.attachNewNode(lines.create())
+            curve.create_curve_geometry(self.line_thickness)
+            node_path = geom_root.attachNewNode(f"curve_{tag}")
             curve.attachCuveNode(node_path)
+
+        if self.edit_mode_enabled and self.active_curve_tag is not None:
+            self.set_active_curve(self.active_curve_tag)
         return geom_root
 
     def set_curve_color(self, tag: str, color: list):
@@ -180,6 +185,27 @@ class Scene:
 
         if curve is not None:
             curve.set_color(color)
+
+    def set_edit_mode(self, enabled: bool):
+        self.edit_mode_enabled = enabled
+        if not enabled:
+            self.active_curve_tag = None
+            for curve in self.curves.values():
+                curve.set_cp_visible(False)
+
+    def set_active_curve(self, tag):
+        try:
+            normalized = int(tag) if tag is not None else None
+        except (TypeError, ValueError):
+            normalized = None
+        self.active_curve_tag = normalized
+        for curve_tag, curve in self.curves.items():
+            curve.set_cp_visible(self.edit_mode_enabled and normalized == curve_tag)
+
+    def preview_control_point(self, tag: int, cp_index: int, new_pos: list[float]):
+        curve = self.curves.get(int(tag))
+        if curve is not None:
+            curve.preview_control_point(int(cp_index), new_pos)
 
 
     def rebuild(self, geom_data: dict):

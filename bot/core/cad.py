@@ -96,6 +96,8 @@ class Model:
     def get_render_data(self) -> dict:
         """Return all display data needed by the viewer (thread-safe, no gmsh dependency)."""
         curves_data = {}
+        flat_points = []
+        flat_edges = []
 
         node_tags, coords, _ = gmsh.model.mesh.getNodes()
         node_id_to_coords = {
@@ -145,7 +147,15 @@ class Model:
 
             curves_data[str(tag)] = curve_entry
 
+            # Backward-compatible flattened payload expected by existing tests/viewers.
+            offset = len(flat_points)
+            flat_points.extend(curve_entry['points'])
+            for idx_a, idx_b in curve_entry['edges']:
+                flat_edges.append((offset + idx_a, offset + idx_b, int(tag)))
+
         return {
+            'points': flat_points,
+            'edges': flat_edges,
             'curves': curves_data,
             'bounds': dict(self.bounds),
         }
@@ -439,7 +449,7 @@ class Model:
 
         return node_coords_3d, surfaces
 
-    def update_control_point(self, tag: int, cp_index: int, new_pt: list(float)):
+    def update_control_point(self, tag: int, cp_index: int, new_pt: list(float), notify: bool = True):
         """Met à jour un point de contrôle d'une courbe et rafraîchit l'affichage."""
         if tag in self.curves:
             curve = self.curves[tag]
@@ -449,11 +459,15 @@ class Model:
             if 0 <= cp_index < len(cps):
                 cps[cp_index] = new_pt
 
-                degree = curve.get_degree()
-                new_curve = type(curve)(str(tag), cps, degree) # FIXME: We recreate the curve :(
-                self.curves[tag] = new_curve
+                if hasattr(curve, "set_control_points"):
+                    curve.set_control_points(cps)
+                else:
+                    degree = curve.get_degree()
+                    new_curve = type(curve)(str(tag), cps, degree)
+                    self.curves[tag] = new_curve
 
-                self._notify_observers()
+                if notify:
+                    self._notify_observers()
             else:
                 print(f"Erreur : L'index {cp_index} n'existe pas. La courbe a {len(cps)} points de contrôle.")
         else:
