@@ -98,11 +98,14 @@ class MouseHandler:
             return None
         p_from = Point3()
         p_to = Point3()
+        # NOTE: créé deux point dans l'espace local de la camera (from position de la camera et to un point très dans la direction que vise la camera)
         if not self.base.camLens.extrude(m_pos, p_from, p_to):
             return None
+        # NOTE: converti les points locaux en point global du monde 3D
         p_from = self.base.render.getRelativePoint(self.base.cam, p_from)
         p_to = self.base.render.getRelativePoint(self.base.cam, p_to)
         hit = Point3()
+        # NOTE: calcule l'intersection du plan 'drag_plane' et du rayon from_p -> to_p
         if self.drag_plane.intersectsLine(hit, p_from, p_to):
             return [hit[0], hit[1], hit[2]]
         return None
@@ -111,8 +114,10 @@ class MouseHandler:
         if not self.edit_mode_enabled:
             return
 
+        # NOTE: Check si une interaction pick un cp vient de commencer
         if left_down and not self._left_was_down and not self.dragging_cp:
             entry = self._pick_entry(m_pos, BitMask32.bit(2))
+            # NOTE: Si le click gauche n'a touché aucune entry du mask 2 la fonction s'arrête
             if entry is None:
                 return
             metadata = self._entry_metadata(entry)
@@ -125,6 +130,7 @@ class MouseHandler:
             self.drag_curve_tag = metadata['curve_tag']
             self.drag_cp_index = int(metadata['cp_index'])
             self.drag_plane = self._build_drag_plane(metadata['point'])
+            self.base._scene.set_cp_color(self.drag_curve_tag,self.drag_cp_index, [1, 0.5, 0, 1])
             self.base._on_event_cb('cp_pick_start', {
                 'tag': self.drag_curve_tag,
                 'cp_index': self.drag_cp_index,
@@ -132,6 +138,7 @@ class MouseHandler:
             })
             return
 
+        # NOTE: le drag du cp est en cours, un envoie régulier de la nouvelle position du cp est envoyé au processus parent
         if self.dragging_cp and left_down:
             world_pos = self._mouse_to_plane(m_pos)
             if world_pos is None:
@@ -145,8 +152,10 @@ class MouseHandler:
             })
             return
 
+        # NOTE: Fin de déplacement du cp, envoie de la posistion final du cp
         if self.dragging_cp and not left_down and self._left_was_down:
             world_pos = self._mouse_to_plane(m_pos)
+            self.base._scene.set_cp_color(self.drag_curve_tag, self.drag_cp_index, [0.5, 0.5, 0.5, 1])
             self.base._on_event_cb('cp_pick_end', {
                 'tag': self.drag_curve_tag,
                 'cp_index': self.drag_cp_index,

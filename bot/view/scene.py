@@ -186,6 +186,19 @@ class Scene:
         if curve is not None:
             curve.set_color(color)
 
+    def set_cp_color(self, tag: str, cp_index: int, color: list):
+        curve = None
+        if tag in self.curves:
+            curve = self.curves[tag]
+        else:
+            try:
+                curve = self.curves.get(int(tag))
+            except (TypeError, ValueError):
+                curve = None
+
+        if curve is not None:
+            curve.set_cp_color(cp_index, color)
+
     def set_edit_mode(self, enabled: bool):
         self.edit_mode_enabled = enabled
         if not enabled:
