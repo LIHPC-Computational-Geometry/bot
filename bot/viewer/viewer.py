@@ -121,7 +121,12 @@ class Viewer:
         return self
 
     def set_axis_constraint(self, mask: int) -> "Viewer":
-        self._send('set_axis_constraint', {'mask': int(mask)})
+        try:
+            normalized = int(mask)
+        except (TypeError, ValueError):
+            normalized = 7
+        normalized = max(0, min(7, normalized))
+        self._send('set_axis_constraint', {'mask': normalized})
         return self
 
     def connect(self, model: Model) -> "Viewer":

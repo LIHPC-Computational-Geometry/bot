@@ -135,10 +135,18 @@ class ViewerApp(ShowBase):
         return task.cont
 
     def _set_axis_constraint(self, mask: int):
-        self.axis_constraint_mask = max(0, min(7, int(mask)))
+        try:
+            raw_mask = int(mask)
+        except (TypeError, ValueError):
+            raw_mask = 7
+            self.hud.setText("Axis constraint invalid, fallback to xyz (7).")
+        self.axis_constraint_mask = max(0, min(7, raw_mask))
+        if self.axis_constraint_mask != raw_mask:
+            self.hud.setText(f"Axis constraint clamped to {self.axis_constraint_mask}.")
         self.mouse_handler.set_axis_constraint(self.axis_constraint_mask)
         if self._scene:
             self._scene.set_axis_constraint(self.axis_constraint_mask)
+        self.hud.setText(f"Axis constraint mask: {self.axis_constraint_mask}")
 
     def _on_axis_constraint_cmd(self, mask: int):
         self._set_axis_constraint(mask)

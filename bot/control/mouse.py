@@ -41,6 +41,8 @@ class MouseHandler:
         self.drag_cp_index = None
         self.drag_plane = None
         self.drag_start_world_pos = None
+        self.drag_last_valid_world_pos = None
+        self.drag_active_mask = 7
         self.axis_constraint_mask = 7
         self._last_drag_emit = 0.0
 
@@ -53,11 +55,7 @@ class MouseHandler:
         self.edit_mode_enabled = bool(enabled)
         self.active_curve_tag = str(curve_tag) if curve_tag is not None else None
         if not self.edit_mode_enabled:
-            self.dragging_cp = False
-            self.drag_curve_tag = None
-            self.drag_cp_index = None
-            self.drag_plane = None
-            self.drag_start_world_pos = None
+            self._reset_drag_state()
 
     def set_axis_constraint(self, mask: int):
         self.axis_constraint_mask = max(0, min(7, int(mask)))
@@ -75,6 +73,27 @@ class MouseHandler:
         if not (self.axis_constraint_mask & 4):
             constrained[2] = start_pos[2]
         return constrained
+
+    def _reset_drag_state(self):
+        self.dragging_cp = False
+        self.drag_curve_tag = None
+        self.drag_cp_index = None
+        self.drag_plane = None
+        self.drag_start_world_pos = None
+        self.drag_last_valid_world_pos = None
+        self.drag_active_mask = self.axis_constraint_mask
+
+    def _finalize_drag(self, world_pos):
+        if self.drag_curve_tag is not None and self.drag_cp_index is not None:
+            if getattr(self.base, "_scene", None) is not None:
+                self.base._scene.set_cp_color(self.drag_curve_tag, self.drag_cp_index, [0.5, 0.5, 0.5, 1])
+                self.base._scene.hide_axis_guide()
+            self.base._on_event_cb('cp_pick_end', {
+                'tag': self.drag_curve_tag,
+                'cp_index': self.drag_cp_index,
+                'world_pos': world_pos,
+            })
+        self._reset_drag_state()
 
     def _pick_entry(self, m_pos, mask: BitMask32):
         self.pickerNode.setFromCollideMask(mask)
@@ -130,8 +149,85 @@ class MouseHandler:
             return [hit[0], hit[1], hit[2]]
         return None
 
+    def _mouse_to_ray(self, m_pos):
+        p_from = Point3()
+        p_to = Point3()
+        if not self.base.camLens.extrude(m_pos, p_from, p_to):
+            return None, None
+        p_from = self.base.render.getRelativePoint(self.base.cam, p_from)
+        p_to = self.base.render.getRelativePoint(self.base.cam, p_to)
+        direction = Vec3(p_to - p_from)
+        if direction.lengthSquared() <= 1e-12:
+            return None, None
+        direction.normalize()
+        return p_from, direction
+
+    def _closest_point_on_axis_to_ray(self, ray_origin, ray_dir, axis_origin, axis_dir):
+        w0 = ray_origin - axis_origin
+        a = ray_dir.dot(ray_dir)
+        b = ray_dir.dot(axis_dir)
+        c = axis_dir.dot(axis_dir)
+        d = ray_dir.dot(w0)
+        e = axis_dir.dot(w0)
+        denom = a * c - b * b
+        if abs(denom) < 1e-10:
+            return None
+        t_axis = (a * e - b * d) / denom
+        hit = axis_origin + axis_dir * t_axis
+        return [hit[0], hit[1], hit[2]]
+
+    def _plane_normal_from_mask(self, mask):
+        if mask == 3:
+            return Vec3(0, 0, 1)
+        if mask == 5:
+            return Vec3(0, 1, 0)
+        if mask == 6:
+            return Vec3(1, 0, 0)
+        return None
+
+    def _mouse_to_constrained_axis(self, m_pos):
+        if self.drag_start_world_pos is None:
+            return None
+        start = self.drag_start_world_pos
+        mask = int(self.drag_active_mask)
+        if mask == 0:
+            return [start[0], start[1], start[2]]
+        if mask == 7:
+            return self._mouse_to_plane(m_pos)
+
+        ray_origin, ray_dir = self._mouse_to_ray(m_pos)
+        if ray_origin is None or ray_dir is None:
+            return None
+
+        if mask in (1, 2, 4):
+            axis_map = {
+                1: Vec3(1, 0, 0),
+                2: Vec3(0, 1, 0),
+                4: Vec3(0, 0, 1),
+            }
+            axis_origin = Point3(start[0], start[1], start[2])
+            axis_dir = axis_map[mask]
+            result = self._closest_point_on_axis_to_ray(ray_origin, ray_dir, axis_origin, axis_dir)
+            if result is not None:
+                return result
+            fallback = self._mouse_to_plane(m_pos)
+            return self._apply_axis_constraint(start, fallback)
+
+        plane_normal = self._plane_normal_from_mask(mask)
+        if plane_normal is not None:
+            plane = Plane(plane_normal, Point3(start[0], start[1], start[2]))
+            ray_to = ray_origin + ray_dir * 100000.0
+            hit = Point3()
+            if plane.intersectsLine(hit, ray_origin, ray_to):
+                return [hit[0], hit[1], hit[2]]
+            fallback = self._mouse_to_plane(m_pos)
+            return self._apply_axis_constraint(start, fallback)
+
+        fallback = self._mouse_to_plane(m_pos)
+        return self._apply_axis_constraint(start, fallback)
+
     def _handle_cp_interaction(self, m_pos, left_down):
-        if not self.edit_mode_enabled:
+        if not getattr(self, "edit_mode_enabled", False) and not getattr(self, "dragging_cp", False):
             return
 
         # NOTE: Check si une interaction pick un cp vient de commencer
@@ -151,9 +247,11 @@ class MouseHandler:
             self.drag_cp_index = int(metadata['cp_index'])
             self.drag_plane = self._build_drag_plane(metadata['point'])
             self.drag_start_world_pos = [metadata['point'][0], metadata['point'][1], metadata['point'][2]]
-            self.base._scene.set_cp_color(self.drag_curve_tag,self.drag_cp_index, [1, 0.5, 0, 1])
+            self.drag_last_valid_world_pos = list(self.drag_start_world_pos)
+            self.drag_active_mask = int(self.axis_constraint_mask)
+            self.base._scene.set_cp_color(self.drag_curve_tag, self.drag_cp_index, [1, 0.5, 0, 1])
             if getattr(self.base, "_scene", None) is not None:
-                self.base._scene.show_axis_guide(self.drag_start_world_pos, self.axis_constraint_mask)
+                self.base._scene.show_axis_guide(self.drag_start_world_pos, self.drag_active_mask)
             self.base._on_event_cb('cp_pick_start', {
                 'tag': self.drag_curve_tag,
                 'cp_index': self.drag_cp_index,
@@ -163,13 +261,14 @@ class MouseHandler:
 
         # NOTE: le drag du cp est en cours, un envoie régulier de la nouvelle position du cp est envoyé au processus parent
         if self.dragging_cp and left_down:
-            world_pos = self._mouse_to_plane(m_pos)
+            self.drag_active_mask = int(self.axis_constraint_mask)
+            world_pos = self._mouse_to_constrained_axis(m_pos)
             if world_pos is None:
                 return
-            world_pos = self._apply_axis_constraint(self.drag_start_world_pos, world_pos)
+            self.drag_last_valid_world_pos = list(world_pos)
             if getattr(self.base, "_scene", None) is not None:
                 self.base._scene.preview_control_point(int(self.drag_curve_tag), self.drag_cp_index, world_pos)
-                self.base._scene.update_axis_guide(world_pos, self.axis_constraint_mask)
+                self.base._scene.update_axis_guide(world_pos, self.drag_active_mask)
             self.base._on_event_cb('cp_drag', {
                 'tag': self.drag_curve_tag,
                 'cp_index': self.drag_cp_index,
@@ -179,21 +278,11 @@ class MouseHandler:
 
         # NOTE: Fin de déplacement du cp, envoie de la posistion final du cp
         if self.dragging_cp and not left_down and self._left_was_down:
-            world_pos = self._mouse_to_plane(m_pos)
-            world_pos = self._apply_axis_constraint(self.drag_start_world_pos, world_pos)
-            self.base._scene.set_cp_color(self.drag_curve_tag, self.drag_cp_index, [0.5, 0.5, 0.5, 1])
-            if getattr(self.base, "_scene", None) is not None:
-                self.base._scene.hide_axis_guide()
-            self.base._on_event_cb('cp_pick_end', {
-                'tag': self.drag_curve_tag,
-                'cp_index': self.drag_cp_index,
-                'world_pos': world_pos,
-            })
-            self.dragging_cp = False
-            self.drag_curve_tag = None
-            self.drag_cp_index = None
-            self.drag_plane = None
-            self.drag_start_world_pos = None
+            self.drag_active_mask = int(self.axis_constraint_mask)
+            world_pos = self._mouse_to_constrained_axis(m_pos)
+            if world_pos is None:
+                world_pos = self.drag_last_valid_world_pos
+            self._finalize_drag(world_pos)
 
     def _handle_curve_click(self, m_pos, left_down):
         if self.edit_mode_enabled:

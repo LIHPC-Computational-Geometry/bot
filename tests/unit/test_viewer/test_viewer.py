@@ -339,6 +339,11 @@ class TestViewerCurveEditMode(unittest.TestCase):
         viewer.set_axis_constraint(6)
         viewer._conn.send.assert_called_with(('set_axis_constraint', {'mask': 6}))
 
+    def test_set_axis_constraint_clamps_invalid_value(self):
+        viewer = self._make_viewer()
+        viewer.set_axis_constraint("oops")
+        viewer._conn.send.assert_called_with(('set_axis_constraint', {'mask': 7}))
+
     def test_default_on_curve_selected_enables_edit_mode(self):
         viewer = self._make_viewer()
         viewer.set_edit_mode = MagicMock()

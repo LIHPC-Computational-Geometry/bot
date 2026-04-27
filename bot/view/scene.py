@@ -10,7 +10,7 @@ _DEFAULT_BOUNDS = {
 }
 
 
-class Gizmo:
+class HUDGizmo:
     """
     Orientation indicator displayed in a corner of the viewport (pixel2d space).
 
@@ -26,7 +26,7 @@ class Gizmo:
         Args:
             parent: Panda3D NodePath to attach the gizmo to.
         """
-        self.root = parent.attachNewNode("gizmo_root")
+        self.root = parent.attachNewNode("hud_gizmo_root")
         self.root.setPos(80, 0, -80)
         self.root.setScale(400)
         self._create_axes()
@@ -83,13 +83,18 @@ class Scene:
         self.edit_mode_enabled = False
         self.axis_constraint_mask = 7
         self._constraint_guide_np = None
+        self._world_axes_np = None
+        self._transform_gizmo_np = None
         self._constraint_guide_origin = None
         self._constraint_guide_visible = False
 
         self.geom_node = self._build_from_data(geom_data)
         self._constraint_guide_np = self.base.render.attachNewNode("constraint_guide_root")
         self._constraint_guide_np.hide()
-        self.gizmo = Gizmo(self.base.pixel2d)
+        self._world_axes_np = self.base.render.attachNewNode("world_axes_root")
+        self._transform_gizmo_np = self.base.render.attachNewNode("transform_gizmo_root")
+        self._transform_gizmo_np.hide()
+        self.gizmo = HUDGizmo(self.base.pixel2d)
         self.add_lighting()
 
     @property
@@ -238,8 +243,13 @@ class Scene:
         max_size = max(size) if size else 1
         return max(2.0, float(max_size) * 0.15)
 
+    def _world_axes_length(self) -> float:
+        size = self.bounds.get('size', [1, 1, 1])
+        max_size = max(size) if size else 1
+        return max(1000.0, float(max_size) * 100.0)
+
     def _draw_axis_line(self, root: NodePath, origin: list[float], axis: str, length: float):
-        colors = {'x': (1, 0, 0, 1), 'y': (0, 1, 0, 1), 'z': (0, 0, 1, 1)}
+        colors = {'x': (1, 0, 0, 0.2), 'y': (0, 1, 0, 0.2), 'z': (0, 0, 1, 0.2)}
         vectors = {'x': (1, 0, 0), 'y': (0, 1, 0), 'z': (0, 0, 1)}
         color = colors[axis]
         vx, vy, vz = vectors[axis]
@@ -251,10 +261,25 @@ class Scene:
         ls.drawTo(origin[0] + vx * length, origin[1] + vy * length, origin[2] + vz * length)
         root.attachNewNode(ls.create())
 
+
+    def _update_transform_gizmo(self, origin: list[float], mask: int):
+        if self._transform_gizmo_np is None:
+            return
+        self._transform_gizmo_np.getChildren().detach()
+        length = self._guide_length()
+        if mask & 1:
+            self._draw_axis_line(self._transform_gizmo_np, origin, 'x', length)
+        if mask & 2:
+            self._draw_axis_line(self._transform_gizmo_np, origin, 'y', length)
+        if mask & 4:
+            self._draw_axis_line(self._transform_gizmo_np, origin, 'z', length)
+
     def show_axis_guide(self, origin: list[float], mask: int):
         self._constraint_guide_visible = True
         self.update_axis_guide(origin, mask)
         self._constraint_guide_np.show()
+        if self._transform_gizmo_np is not None:
+            self._transform_gizmo_np.show()
 
     def update_axis_guide(self, origin: list[float], mask: int):
         if self._constraint_guide_np is None:
@@ -269,6 +294,7 @@ class Scene:
             self._draw_axis_line(self._constraint_guide_np, origin, 'y', length)
         if mask & 4:
             self._draw_axis_line(self._constraint_guide_np, origin, 'z', length)
+        self._update_transform_gizmo(origin, mask)
 
     def hide_axis_guide(self):
         self._constraint_guide_visible = False
@@ -276,6 +302,9 @@ class Scene:
         if self._constraint_guide_np is not None:
             self._constraint_guide_np.getChildren().detach()
             self._constraint_guide_np.hide()
+        if self._transform_gizmo_np is not None:
+            self._transform_gizmo_np.getChildren().detach()
+            self._transform_gizmo_np.hide()
 
 
     def rebuild(self, geom_data: dict):
@@ -293,6 +322,14 @@ class Scene:
         if self._constraint_guide_np is not None:
             self._constraint_guide_np.removeNode()
             self._constraint_guide_np = None
+        if self._world_axes_np is not None:
+            self._world_axes_np.removeNode()
+            self._world_axes_np = None
+        if self._transform_gizmo_np is not None:
+            self._transform_gizmo_np.removeNode()
+            self._transform_gizmo_np = None
+        if hasattr(self, 'gizmo') and self.gizmo is not None and hasattr(self.gizmo, 'root'):
+            self.gizmo.root.removeNode()
 
     def apply_settings(self, settings: dict):
         """
