@@ -81,8 +81,14 @@ class Scene:
         self.curves = {}
         self.active_curve_tag = None
         self.edit_mode_enabled = False
+        self.axis_constraint_mask = 7
+        self._constraint_guide_np = None
+        self._constraint_guide_origin = None
+        self._constraint_guide_visible = False
 
         self.geom_node = self._build_from_data(geom_data)
+        self._constraint_guide_np = self.base.render.attachNewNode("constraint_guide_root")
+        self._constraint_guide_np.hide()
         self.gizmo = Gizmo(self.base.pixel2d)
         self.add_lighting()
 
@@ -219,6 +225,57 @@ class Scene:
         curve = self.curves.get(int(tag))
         if curve is not None:
             curve.preview_control_point(int(cp_index), new_pos)
+        if self._constraint_guide_visible:
+            self.update_axis_guide(new_pos, self.axis_constraint_mask)
+
+    def set_axis_constraint(self, mask: int):
+        self.axis_constraint_mask = max(0, min(7, int(mask)))
+        if self._constraint_guide_visible and self._constraint_guide_origin is not None:
+            self.update_axis_guide(self._constraint_guide_origin, self.axis_constraint_mask)
+
+    def _guide_length(self) -> float:
+        size = self.bounds.get('size', [1, 1, 1])
+        max_size = max(size) if size else 1
+        return max(2.0, float(max_size) * 0.15)
+
+    def _draw_axis_line(self, root: NodePath, origin: list[float], axis: str, length: float):
+        colors = {'x': (1, 0, 0, 1), 'y': (0, 1, 0, 1), 'z': (0, 0, 1, 1)}
+        vectors = {'x': (1, 0, 0), 'y': (0, 1, 0), 'z': (0, 0, 1)}
+        color = colors[axis]
+        vx, vy, vz = vectors[axis]
+
+        ls = LineSegs()
+        ls.setThickness(2)
+        ls.setColor(*color)
+        ls.moveTo(origin[0] - vx * length, origin[1] - vy * length, origin[2] - vz * length)
+        ls.drawTo(origin[0] + vx * length, origin[1] + vy * length, origin[2] + vz * length)
+        root.attachNewNode(ls.create())
+
+    def show_axis_guide(self, origin: list[float], mask: int):
+        self._constraint_guide_visible = True
+        self.update_axis_guide(origin, mask)
+        self._constraint_guide_np.show()
+
+    def update_axis_guide(self, origin: list[float], mask: int):
+        if self._constraint_guide_np is None:
+            return
+        self._constraint_guide_origin = [origin[0], origin[1], origin[2]]
+        self._constraint_guide_np.getChildren().detach()
+
+        length = self._guide_length()
+        if mask & 1:
+            self._draw_axis_line(self._constraint_guide_np, origin, 'x', length)
+        if mask & 2:
+            self._draw_axis_line(self._constraint_guide_np, origin, 'y', length)
+        if mask & 4:
+            self._draw_axis_line(self._constraint_guide_np, origin, 'z', length)
+
+    def hide_axis_guide(self):
+        self._constraint_guide_visible = False
+        self._constraint_guide_origin = None
+        if self._constraint_guide_np is not None:
+            self._constraint_guide_np.getChildren().detach()
+            self._constraint_guide_np.hide()
 
 
     def rebuild(self, geom_data: dict):
@@ -233,6 +290,9 @@ class Scene:
         if self.geom_node is not None:
             self.geom_node.removeNode()
             self.geom_node = None
+        if self._constraint_guide_np is not None:
+            self._constraint_guide_np.removeNode()
+            self._constraint_guide_np = None
 
     def apply_settings(self, settings: dict):
         """

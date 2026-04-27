@@ -56,6 +56,8 @@ class ViewerApp(ShowBase):
 
         self.kb_handler = KeyboardHandler(self)
         self.mouse_handler = MouseHandler(self)
+        self.axis_constraint_mask = 7
+        self.accept("cmd_axis_constraint", self._on_axis_constraint_cmd)
 
         self.hud = OnscreenText(
             text="",
@@ -126,9 +128,20 @@ class ViewerApp(ShowBase):
                     self.mouse_handler.set_edit_mode(self.mouse_handler.edit_mode_enabled, curve_tag)
                     if self._scene:
                         self._scene.set_active_curve(curve_tag)
+                elif cmd == 'set_axis_constraint':
+                    self._set_axis_constraint(data.get('mask', 7))
             except queue.Empty:
                 break
         return task.cont
+
+    def _set_axis_constraint(self, mask: int):
+        self.axis_constraint_mask = max(0, min(7, int(mask)))
+        self.mouse_handler.set_axis_constraint(self.axis_constraint_mask)
+        if self._scene:
+            self._scene.set_axis_constraint(self.axis_constraint_mask)
+
+    def _on_axis_constraint_cmd(self, mask: int):
+        self._set_axis_constraint(mask)
 
     def load_scene(self, geom_data: dict):
         """Load (or reload) the scene from geom_data."""
@@ -136,6 +149,7 @@ class ViewerApp(ShowBase):
             self._scene.clear()
 
         self._scene = Scene(self, geom_data, self._scene_cfg())
+        self._scene.set_axis_constraint(self.axis_constraint_mask)
 
         if self._camera_controller is None:
             self._camera_controller = CameraController(self, self._scene, self._camera_cfg())

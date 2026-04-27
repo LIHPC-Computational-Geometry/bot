@@ -120,6 +120,10 @@ class Viewer:
         self._send('set_active_curve', {'curve_tag': curve_tag})
         return self
 
+    def set_axis_constraint(self, mask: int) -> "Viewer":
+        self._send('set_axis_constraint', {'mask': int(mask)})
+        return self
+
     def connect(self, model: Model) -> "Viewer":
         """
         Connects this viewer to a Model core.
