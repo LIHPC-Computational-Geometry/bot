@@ -120,7 +120,13 @@ class Scene:
 
         for tag, tag_edges in edges_by_tag.items():
             lines = LineSegs()
-            lines.setThickness(self.line_thickness)
+            is_control_polygon = tag.endswith('_cp')
+
+            if is_control_polygon:
+                lines.setThickness(1.0)
+                lines.setColor(0.5, 0.5, 0.5, 1)
+            else:
+                lines.setThickness(self.line_thickness)
 
             cnode = CollisionNode(f"col_{tag}")
 
@@ -129,15 +135,20 @@ class Scene:
             for idxA, idxB in tag_edges:
                 ptA = points[idxA]
                 ptB = points[idxB]
-                lines.moveTo(ptA)
-                lines.drawTo(ptB)
+                # NOTE: '*' pour décompresser la liste/tuple en 3 arguments (x, y, z) pour Panda3D
+                lines.moveTo(*ptA)
+                lines.drawTo(*ptB)
 
-                radius = 1.0
-                tube = CollisionTube(ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius)
-                cnode.addSolid(tube)
+                if not is_control_polygon:
+                    radius = 1.0
+                    tube = CollisionTube(ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius)
+                    cnode.addSolid(tube)
 
             node_path = geom_root.attachNewNode(lines.create())
             self.curve_nodes[tag] = node_path
+
+            if is_control_polygon:
+                node_path.hide()
 
             cnp = node_path.attachNewNode(cnode)
             cnp.setTag('curve_tag', tag)
@@ -151,6 +162,14 @@ class Scene:
             node = self.curve_nodes[tag_str]
             node.setColor(color[0], color[1], color[2], color[3], 1)
             node.setLightOff(1)
+
+            cp_tag = f"{tag_str}_cp"
+            if cp_tag in self.curve_nodes:
+                if color[:3] == [1.0, 1.0, 1.0]:
+                    self.curve_nodes[cp_tag].hide()
+                else:
+                    self.curve_nodes[cp_tag].show()
+
 
 
     def rebuild(self, geom_data: dict):

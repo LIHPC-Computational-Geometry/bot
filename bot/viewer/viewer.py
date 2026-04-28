@@ -1,11 +1,11 @@
 """
-Viewer: lance Panda3D dans un sous-processus séparé.
+Viewer: launches Panda3D in a separate subprocess.
 
-Sur macOS (et en général), OpenGL doit tourner sur le thread principal du
-processus qui possède la fenêtre. En lançant Panda3D dans un sous-processus,
-son thread principal est libre pour Panda3D, et le thread principal d'IPython
-reste entièrement interactif. Les données transitent par un Pipe
-multiprocessing sous forme de dicts sérialisables.
+On macOS (and in general), OpenGL must run on the main thread of the
+process that owns the window. By launching Panda3D in a subprocess,
+its main thread is free for Panda3D, and the IPython main thread
+remains fully interactive. Data flows through a multiprocessing Pipe
+in the form of serializable dicts.
 """
 
 import math
@@ -14,27 +14,28 @@ import threading
 from typing import Callable, Optional
 
 from bot.core.cad import Model
+from bot.core.curve import BezierCurve
 
 
 # ---------------------------------------------------------------------------
-# Fonction d'entrée du sous-processus (doit être au niveau module pour pickle)
+# Subprocess entry function (must be at module level for pickle)
 # ---------------------------------------------------------------------------
 
 def _viewer_subprocess(conn, config_filename: str):
     """
-    Point d'entrée du sous-processus Panda3D.
-    Tourne sur le thread principal du sous-processus → macOS safe.
+    Panda3D subprocess entry point.
+    Runs on the subprocess main thread → macOS safe.
     """
     import queue as _queue
     cmd_queue = _queue.Queue()
 
-    # Thread qui lit le pipe parent → met dans la queue interne
+    # Thread that reads the parent pipe → puts into the internal queue
     def _pipe_reader():
         while True:
             try:
                 msg = conn.recv()
                 cmd_queue.put(msg)
-                if msg[0] == 'exit': # Commande de sortie
+                if msg[0] == 'exit': # Exit command
                     break
             except EOFError:
                 break
@@ -49,37 +50,37 @@ def _viewer_subprocess(conn, config_filename: str):
 
     from bot.viewer.app import ViewerApp
     app = ViewerApp(config_filename, cmd_queue, on_event)
-    app.run()   # bloquant — c'est voulu, c'est le thread principal du sous-processus
+    app.run()   # blocking — intentional, it's the main thread of the subprocess
 
 
 # ---------------------------------------------------------------------------
-# API publique
+# Public API
 # ---------------------------------------------------------------------------
 
 class Viewer:
     """
-    Viewer 3D connecté à un noyau Model.
+    3D Viewer connected to a Model core.
 
-    Usage en IPython :
+    IPython usage:
         k = bot.CADModel()
         k.open("part.geo")
 
         v = bot.Viewer()
-        v.connect(k).run()   # non-bloquant : Panda3D tourne dans un sous-processus
+        v.connect(k).run()   # non-blocking: Panda3D runs in a subprocess
 
-        k.add_point([1, 2, 3])                      # → viewer mis à jour
-        v.on_pick = lambda coords: k.add_point(coords)  # viewer → noyau
+        k.add_point([1, 2, 3])                      # → viewer updated
+        v.on_pick = lambda coords: k.add_point(coords)  # viewer → core
 
-    Plusieurs viewers peuvent être connectés au même modèle (un sous-processus
-    par viewer).
+    Multiple viewers can be connected to the same model (one subprocess
+    per viewer).
     """
 
     def __init__(self, config_filename: str = "bot_config.toml"):
         self._config_filename = config_filename
         self.model: Optional[Model] = None
-        self._conn = None           # extrémité parent du Pipe
-        self._process = None        # sous-processus Panda3D
-        self._event_thread = None   # thread d'écoute des events retour
+        self._conn = None           # parent end of the Pipe
+        self._process = None        # Panda3D subprocess
+        self._event_thread = None   # event listening thread
         self._running = False
 
         self._default_last_hovered = None
@@ -90,24 +91,24 @@ class Viewer:
 
 
     # ------------------------------------------------------------------
-    # API publique
+    # Public API
     # ------------------------------------------------------------------
 
     def highlight_curve(self, tag: str, color: list) -> "Viewer":
-        """Colore la géométrie associée à un tag."""
+        """Colors the geometry associated with a tag."""
         self._send('highlight_curve', {'tag': tag, 'color': color})
         return self
 
     def set_hud_text(self, text: str) -> "Viewer":
-        """Met à jour le texte affiché en surimpression à l'écran."""
+        """Updates the text displayed in an overlay on the screen."""
         self._send('update_hud', {'text': text})
         return self
 
     def connect(self, model: Model) -> "Viewer":
         """
-        Connecte ce viewer à un noyau Model.
-        Peut être appelé avant ou après run().
-        Retourne self pour le chaînage.
+        Connects this viewer to a Model core.
+        Can be called before or after run().
+        Returns self for chaining.
         """
         if self.model is not None:
             self.model.remove_observer(self)
@@ -118,7 +119,7 @@ class Viewer:
         return self
 
     def disconnect(self) -> "Viewer":
-        """Détache le viewer du modèle courant."""
+        """Detaches the viewer from the current model."""
         if self.model is not None:
             self.model.remove_observer(self)
             self.model = None
@@ -126,8 +127,8 @@ class Viewer:
 
     def run(self) -> "Viewer":
         """
-        Lance le viewer dans un sous-processus séparé (non-bloquant).
-        Retourne self pour le chaînage.
+        Launches the viewer in a separate subprocess (non-blocking).
+        Returns self for chaining.
         """
         self._running = True
 
@@ -141,7 +142,7 @@ class Viewer:
             daemon=True,
         )
         self._process.start()
-        child_conn.close()  # inutile dans le processus parent
+        child_conn.close()  # useless in the parent process
 
         if self.model is not None:
             self._send('load', self.model.get_render_data())
@@ -151,28 +152,28 @@ class Viewer:
 
     def stop(self):
         """
-        Arrête proprement le viewer et libère les ressources.
+        Stops the viewer cleanly and frees resources.
         """
         self._running = False
 
-        # 1. Notifier le modèle qu'on ne regarde plus
+        # 1. Notify the model that we are no longer watching
         self.disconnect()
 
-        # 2. Envoyer le signal d'arrêt au sous-processus
+        # 2. Send the stop signal to the subprocess
         if self._conn is not None:
             try:
                 self._send('exit', None)
             except:
                 pass
 
-        # 3. Attendre la fin du processus
+        # 3. Wait for the process to finish
         if self._process is not None:
-            self._process.join(timeout=2.0) # On laisse 2 secondes pour fermer
+            self._process.join(timeout=2.0) # We allow 2 seconds to close
             if self._process.is_alive():
-                self._process.terminate() # Force brute si tjs vivant
+                self._process.terminate() # Brute force if still alive
             self._process = None
 
-        # 4. Fermer la communication
+        # 4. Close communication
         if self._conn is not None:
             self._conn.close()
             self._conn = None
@@ -180,7 +181,7 @@ class Viewer:
         self._event_thread = None
         print("Stopped Viewer")
     # ------------------------------------------------------------------
-    # Callback observer (appelé par Model quand l'état change)
+    # Observer callback (called by Model when state changes)
     # ------------------------------------------------------------------
 
     def update(self, model: Model):
@@ -188,7 +189,7 @@ class Viewer:
         self._send('update', model.get_render_data())
 
     # ------------------------------------------------------------------
-    # Helpers internes
+    # Internal helpers
     # ------------------------------------------------------------------
 
     def _send(self, cmd: str, data):
@@ -200,7 +201,7 @@ class Viewer:
                 pass
 
     def _start_event_listener(self):
-        """Thread léger qui reçoit les events du sous-processus (ex : picking)."""
+        """Lightweight thread that receives events from the subprocess (e.g., picking)."""
         def _listen():
             while self._running:
                 try:
@@ -219,46 +220,62 @@ class Viewer:
         self._event_thread.start()
 
     # ------------------------------------------------------------------
-    # Comportements Interactifs par Défaut
+    # Default Interactive Behaviors
     # ------------------------------------------------------------------
 
     def _default_on_hover(self, tag):
-        """Comportement par défaut : met en surbrillance et affiche les détails spatiaux."""
+        """Default behavior: highlights and displays spatial details."""
         if tag is not None:
-            # 1. Nettoyage de la courbe précédente
+            # 1. Cleanup of the previous curve
             if self._default_last_hovered is not None and self._default_last_hovered != tag:
                 self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1])
 
-            # 2. Construction du texte d'information
-            info_text = f"--- Courbe {tag} ---\n"
+            # 2. Building the information text
+            info_text = f"--- Curve {tag} ---\n"
 
             if self.model is not None:
                 try:
-                    # Récupération des tags des extrémités (ex: [1, 2])
-                    tags_ext = self.model.get_end_points(int(tag))
-
-                    # Récupération des coordonnées réelles via la nouvelle fonction
-                    coords_a = self.model.get_point_coords(tags_ext[0])
-                    coords_b = self.model.get_point_coords(tags_ext[1])
+                    coords_a, coords_b = self.model.get_end_points_coords(int(tag))
 
                     pt_a = f"({coords_a[0]:.2f}, {coords_a[1]:.2f}, {coords_a[2]:.2f})"
                     pt_b = f"({coords_b[0]:.2f}, {coords_b[1]:.2f}, {coords_b[2]:.2f})"
 
-                    info_text += f"Type : Segment Linéaire\n"
-                    info_text += f"Extrémité A : {pt_a}\n"
-                    info_text += f"Extrémité B : {pt_b}"
+                    info_text += f"Type: Linear Segment\n"
+                    info_text += f"End A: {pt_a}\n"
+                    info_text += f"End B: {pt_b}"
 
                 except Exception as e:
-                    info_text += f"Erreur : {str(e)}"
+                    info_text += f"Error: {str(e)}"
 
-            # 3. Application visuelle
+            # 3. Visual application
             self.set_hud_text(info_text)
             self.highlight_curve(tag, [1, 0.5, 0, 1])
             self._default_last_hovered = tag
 
         else:
-            # Gestion du vide
+            # Handle empty selection
             if self._default_last_hovered is not None:
                 self.highlight_curve(self._default_last_hovered, [1, 1, 1, 1])
-                self.set_hud_text("Prêt. Survolez ou cliquez sur les courbes.")
+                self.set_hud_text("Ready. Hover or click on the curves.")
                 self._default_last_hovered = None
+
+    def bezier_conversion(self, degree: int):
+        if self._default_last_hovered is not None:
+            tag = self._default_last_hovered
+            if self.model is not None:
+                print(self.model.get_render_data())
+                coords_a, coords_b = self.model.get_end_points_coords(int(tag))
+                control_points = BezierCurve._default_control_points(coords_a, coords_b, degree)
+                curve = BezierCurve(tag, control_points, degree)
+                self.model.set_curve(tag, curve)
+            else:
+                self.set_hud_text("Impossible to convert: no model loaded")
+        else:
+            self.set_hud_text("Impossible to convert: no curve selected")
+
+    def move_control_point(self, tag: int, cp_index: int, new_pos: list(float)):
+        if self.model is not None:
+            self.model.update_control_point(tag, cp_index, new_pos)
+            self.set_hud_text(f"Control point {cp_index} of curve {tag} moved.")
+        else:
+            self.set_hud_text("No model loaded.")
