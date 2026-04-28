@@ -318,9 +318,8 @@ class Viewer:
 
     def bezier_conversion(self, degree: int):
         if self._default_last_hovered is not None:
-            tag = self._default_last_hovered
+            tag = int(self._default_last_hovered)
             if self.model is not None:
-                print(self.model.get_render_data())
                 coords_a, coords_b = self.model.get_end_points_coords(int(tag))
                 control_points = BezierCurve._default_control_points(coords_a, coords_b, degree)
                 curve = BezierCurve(tag, control_points, degree)
