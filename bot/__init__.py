@@ -24,4 +24,4 @@ except ModuleNotFoundError:
     CADModel = None
 Model = CADModel
 
-__all__ = ['core', 'control', 'view', 'viewer', 'Model', 'Viewer']
+__all__ = ["core", "control", "view", "viewer", "Model", "Viewer"]

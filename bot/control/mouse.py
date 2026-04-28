@@ -1,6 +1,12 @@
 from direct.showbase.InputStateGlobal import inputState
-from panda3d.core import BitMask32, CollisionHandlerQueue, CollisionNode, CollisionRay, CollisionTraverser
-from panda3d.core import GeomNode, MouseButton, Plane, Point2, Point3, Vec3
+from panda3d.core import (
+    BitMask32,
+    CollisionHandlerQueue,
+    CollisionNode,
+    CollisionRay,
+    CollisionTraverser,
+)
+from panda3d.core import MouseButton, Plane, Point2, Point3, Vec3
 
 
 class MouseHandler:
@@ -25,7 +31,7 @@ class MouseHandler:
 
         self.picker = CollisionTraverser()
         self.pq = CollisionHandlerQueue()
-        self.pickerNode = CollisionNode('mouseRay')
+        self.pickerNode = CollisionNode("mouseRay")
         self.pickerNP = self.base.camera.attachNewNode(self.pickerNode)
         self.pickerNode.setFromCollideMask(BitMask32.bit(1) | BitMask32.bit(2))
         self.pickerNode.setIntoCollideMask(BitMask32.allOff())
@@ -46,8 +52,12 @@ class MouseHandler:
         self.axis_constraint_mask = 7
         self._last_drag_emit = 0.0
 
-        self.base.accept("wheel_up",   lambda: self.base.messenger.send("cmd_zoom", [0.9]))
-        self.base.accept("wheel_down", lambda: self.base.messenger.send("cmd_zoom", [1.1]))
+        self.base.accept(
+            "wheel_up", lambda: self.base.messenger.send("cmd_zoom", [0.9])
+        )
+        self.base.accept(
+            "wheel_down", lambda: self.base.messenger.send("cmd_zoom", [1.1])
+        )
 
         self.base.taskMgr.add(self.update, "MouseTask")
 
@@ -86,13 +96,18 @@ class MouseHandler:
     def _finalize_drag(self, world_pos):
         if self.drag_curve_tag is not None and self.drag_cp_index is not None:
             if getattr(self.base, "_scene", None) is not None:
-                self.base._scene.set_cp_color(self.drag_curve_tag, self.drag_cp_index, [0.5, 0.5, 0.5, 1])
+                self.base._scene.set_cp_color(
+                    self.drag_curve_tag, self.drag_cp_index, [0.5, 0.5, 0.5, 1]
+                )
                 self.base._scene.hide_axis_guide()
-            self.base._on_event_cb('cp_pick_end', {
-                'tag': self.drag_curve_tag,
-                'cp_index': self.drag_cp_index,
-                'world_pos': world_pos,
-            })
+            self.base._on_event_cb(
+                "cp_pick_end",
+                {
+                    "tag": self.drag_curve_tag,
+                    "cp_index": self.drag_cp_index,
+                    "world_pos": world_pos,
+                },
+            )
         self._reset_drag_state()
 
     def _pick_entry(self, m_pos, mask: BitMask32):
@@ -107,10 +122,14 @@ class MouseHandler:
     def _entry_metadata(self, entry):
         np = entry.getIntoNodePath()
         return {
-            'curve_tag': np.getNetTag('curve_tag') if np.hasNetTag('curve_tag') else None,
-            'cp_index': np.getNetTag('cp_index') if np.hasNetTag('cp_index') else None,
-            'pick_kind': np.getNetTag('pick_kind') if np.hasNetTag('pick_kind') else None,
-            'point': entry.getSurfacePoint(self.base.render),
+            "curve_tag": np.getNetTag("curve_tag")
+            if np.hasNetTag("curve_tag")
+            else None,
+            "cp_index": np.getNetTag("cp_index") if np.hasNetTag("cp_index") else None,
+            "pick_kind": np.getNetTag("pick_kind")
+            if np.hasNetTag("pick_kind")
+            else None,
+            "point": entry.getSurfacePoint(self.base.render),
         }
 
     def _handle_hover(self, m_pos):
@@ -119,13 +138,13 @@ class MouseHandler:
         hover_entry = self._pick_entry(m_pos, BitMask32.bit(1))
         if hover_entry is not None:
             metadata = self._entry_metadata(hover_entry)
-            hovered_tag = metadata['curve_tag']
+            hovered_tag = metadata["curve_tag"]
 
         # Si on survole une nouvelle courbe (ou si on ne survole plus rien)
         if hovered_tag != self.last_hovered_tag:
             self.last_hovered_tag = hovered_tag
             # On envoie l'info au parent via le callback
-            self.base._on_event_cb('hover', hovered_tag)
+            self.base._on_event_cb("hover", hovered_tag)
 
     def _build_drag_plane(self, start_point: Point3):
         normal = self.base.render.getRelativeVector(self.base.cam, Vec3(0, 1, 0))
@@ -207,7 +226,9 @@ class MouseHandler:
             }
             axis_origin = Point3(start[0], start[1], start[2])
             axis_dir = axis_map[mask]
-            result = self._closest_point_on_axis_to_ray(ray_origin, ray_dir, axis_origin, axis_dir)
+            result = self._closest_point_on_axis_to_ray(
+                ray_origin, ray_dir, axis_origin, axis_dir
+            )
             if result is not None:
                 return result
             fallback = self._mouse_to_plane(m_pos)
@@ -227,7 +248,9 @@ class MouseHandler:
         return self._apply_axis_constraint(start, fallback)
 
     def _handle_cp_interaction(self, m_pos, left_down):
-        if not getattr(self, "edit_mode_enabled", False) and not getattr(self, "dragging_cp", False):
+        if not getattr(self, "edit_mode_enabled", False) and not getattr(
+            self, "dragging_cp", False
+        ):
             return
 
         # NOTE: Check si une interaction pick un cp vient de commencer
@@ -237,26 +260,44 @@ class MouseHandler:
             if entry is None:
                 return
             metadata = self._entry_metadata(entry)
-            if metadata['pick_kind'] != 'cp' or metadata['curve_tag'] is None or metadata['cp_index'] is None:
+            if (
+                metadata["pick_kind"] != "cp"
+                or metadata["curve_tag"] is None
+                or metadata["cp_index"] is None
+            ):
                 return
-            if self.active_curve_tag is not None and metadata['curve_tag'] != self.active_curve_tag:
+            if (
+                self.active_curve_tag is not None
+                and metadata["curve_tag"] != self.active_curve_tag
+            ):
                 return
 
             self.dragging_cp = True
-            self.drag_curve_tag = metadata['curve_tag']
-            self.drag_cp_index = int(metadata['cp_index'])
-            self.drag_plane = self._build_drag_plane(metadata['point'])
-            self.drag_start_world_pos = [metadata['point'][0], metadata['point'][1], metadata['point'][2]]
+            self.drag_curve_tag = metadata["curve_tag"]
+            self.drag_cp_index = int(metadata["cp_index"])
+            self.drag_plane = self._build_drag_plane(metadata["point"])
+            self.drag_start_world_pos = [
+                metadata["point"][0],
+                metadata["point"][1],
+                metadata["point"][2],
+            ]
             self.drag_last_valid_world_pos = list(self.drag_start_world_pos)
             self.drag_active_mask = int(self.axis_constraint_mask)
-            self.base._scene.set_cp_color(self.drag_curve_tag, self.drag_cp_index, [1, 0.5, 0, 1])
+            self.base._scene.set_cp_color(
+                self.drag_curve_tag, self.drag_cp_index, [1, 0.5, 0, 1]
+            )
             if getattr(self.base, "_scene", None) is not None:
-                self.base._scene.show_axis_guide(self.drag_start_world_pos, self.drag_active_mask)
-            self.base._on_event_cb('cp_pick_start', {
-                'tag': self.drag_curve_tag,
-                'cp_index': self.drag_cp_index,
-                'world_pos': self.drag_start_world_pos,
-            })
+                self.base._scene.show_axis_guide(
+                    self.drag_start_world_pos, self.drag_active_mask
+                )
+            self.base._on_event_cb(
+                "cp_pick_start",
+                {
+                    "tag": self.drag_curve_tag,
+                    "cp_index": self.drag_cp_index,
+                    "world_pos": self.drag_start_world_pos,
+                },
+            )
             return
 
         # NOTE: le drag du cp est en cours, un envoie régulier de la nouvelle position du cp est envoyé au processus parent
@@ -267,13 +308,18 @@ class MouseHandler:
                 return
             self.drag_last_valid_world_pos = list(world_pos)
             if getattr(self.base, "_scene", None) is not None:
-                self.base._scene.preview_control_point(int(self.drag_curve_tag), self.drag_cp_index, world_pos)
+                self.base._scene.preview_control_point(
+                    int(self.drag_curve_tag), self.drag_cp_index, world_pos
+                )
                 self.base._scene.update_axis_guide(world_pos, self.drag_active_mask)
-            self.base._on_event_cb('cp_drag', {
-                'tag': self.drag_curve_tag,
-                'cp_index': self.drag_cp_index,
-                'world_pos': world_pos,
-            })
+            self.base._on_event_cb(
+                "cp_drag",
+                {
+                    "tag": self.drag_curve_tag,
+                    "cp_index": self.drag_cp_index,
+                    "world_pos": world_pos,
+                },
+            )
             return
 
         # NOTE: Fin de déplacement du cp, envoie de la posistion final du cp
@@ -293,8 +339,8 @@ class MouseHandler:
         if entry is None:
             return
         metadata = self._entry_metadata(entry)
-        if metadata['pick_kind'] == 'curve' and metadata['curve_tag'] is not None:
-            self.base._on_event_cb('curve_selected', metadata['curve_tag'])
+        if metadata["pick_kind"] == "curve" and metadata["curve_tag"] is not None:
+            self.base._on_event_cb("curve_selected", metadata["curve_tag"])
 
     def _handle_drag(self, curr_pos):
         """Handles mouse drag for rotating and panning."""
@@ -310,9 +356,13 @@ class MouseHandler:
                 # On n'envoie le message QUE si la souris a réellement bougé
                 if delta.lengthSquared() > 0:
                     if self.base.mouseWatcherNode.isButtonDown("shift"):
-                        self.base.messenger.send("cmd_pan", [delta.getX(), delta.getY()])
+                        self.base.messenger.send(
+                            "cmd_pan", [delta.getX(), delta.getY()]
+                        )
                     else:
-                        self.base.messenger.send("cmd_rotate", [delta.getX(), delta.getY()])
+                        self.base.messenger.send(
+                            "cmd_rotate", [delta.getX(), delta.getY()]
+                        )
 
             # CRITIQUE : On met à jour prev_mouse_pos À CHAQUE FRAME
             # pour que le delta reste minuscule entre deux frames.
@@ -346,4 +396,4 @@ class MouseHandler:
 
     def is_shift_down(self):
         """Return True if the Shift modifier is currently held."""
-        return inputState.isSet('shift')
+        return inputState.isSet("shift")

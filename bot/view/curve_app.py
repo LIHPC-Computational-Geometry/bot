@@ -1,5 +1,12 @@
 from panda3d.core import BitMask32, CollisionNode, CollisionSphere, CollisionTube
-from panda3d.core import Geom, GeomNode, GeomPoints, GeomVertexData, GeomVertexFormat, GeomVertexWriter
+from panda3d.core import (
+    Geom,
+    GeomNode,
+    GeomPoints,
+    GeomVertexData,
+    GeomVertexFormat,
+    GeomVertexWriter,
+)
 from panda3d.core import LineSegs, NodePath
 
 import nurbslib
@@ -8,12 +15,13 @@ import nurbslib
 MASK_CURVE_PICK = BitMask32.bit(1)
 MASK_CP_PICK = BitMask32.bit(2)
 
+
 class CurveApp:
     def __init__(self, tag: str, curve_data: dict):
         self.tag: int = int(tag)
-        self.edges: list = curve_data['edges']
-        self.points: list = curve_data['points']
-        self.type: str = curve_data['type']
+        self.edges: list = curve_data["edges"]
+        self.points: list = curve_data["points"]
+        self.type: str = curve_data["type"]
 
         self.node_path: NodePath | None = None
         self.curve_render_node: NodePath | None = None
@@ -31,23 +39,24 @@ class CurveApp:
         self.line_thickness = 2
         self.cp_color: list | None = None
 
-        if self.type == 'bezier' or self.type == 'bspline':
-            self.control_points = curve_data['control_points']
-            self.cp_color = [[0.5, 0.5, 0.5, 1] for _ in range(len(self.control_points))]
-            self.degree = curve_data['degree']
+        if self.type == "bezier" or self.type == "bspline":
+            self.control_points = curve_data["control_points"]
+            self.cp_color = [
+                [0.5, 0.5, 0.5, 1] for _ in range(len(self.control_points))
+            ]
+            self.degree = curve_data["degree"]
 
         # TODO: bspline / nurbs not already implemented
-        if self.type == 'bspline':
-            self.knots = curve_data['knots']
-
+        if self.type == "bspline":
+            self.knots = curve_data["knots"]
 
     def _draw_control_points(self, node_path: NodePath):
         format = GeomVertexFormat.getV3cp()
         # NOTE: correspond à l'espace mémoire utilisé pour stocker les points 3D
-        vdata = GeomVertexData('anchors', format, Geom.UHDynamic)
+        vdata = GeomVertexData("anchors", format, Geom.UHDynamic)
         # NOTE: permet d'écrire dans l'espace mémoire vdata dans la 'colonne' nommé 'vertex'
-        vertex = GeomVertexWriter(vdata, 'vertex')
-        color_writer = GeomVertexWriter(vdata, 'color')
+        vertex = GeomVertexWriter(vdata, "vertex")
+        color_writer = GeomVertexWriter(vdata, "color")
 
         # NOTE: Permet de dire au GPU de traiter les coordonnée en tant que point flottant (on pourrait très bien utiliser GeomTriangles(Geom.UHDynamic) pour dessiner des surffaces)
         prim = GeomPoints(Geom.UHDynamic)
@@ -62,7 +71,7 @@ class CurveApp:
         geom = Geom(vdata)
         geom.addPrimitive(prim)
         # NOTE: Emballe le Geom pour être lisible par le moteur 3D
-        gnode = GeomNode(f'anchors_{self.tag}')
+        gnode = GeomNode(f"anchors_{self.tag}")
         gnode.addGeom(geom)
 
         if self._cp_geom_node is not None:
@@ -81,7 +90,6 @@ class CurveApp:
         if self._cp_line_node is not None:
             self._cp_line_node.removeNode()
         self._cp_line_node = node_path.attachNewNode(lines.create())
-
 
     def _attachCPNode(self):
         self.cp_render_node = self.node_path.attachNewNode("cp_render")
@@ -106,10 +114,9 @@ class CurveApp:
             cnode.setFromCollideMask(BitMask32.allOff())
             cnode.addSolid(CollisionSphere(pt[0], pt[1], pt[2], 1.2))
             cnp = self.cp_collision_node.attachNewNode(cnode)
-            cnp.setTag('curve_tag', str(self.tag))
-            cnp.setTag('cp_index', str(i))
-            cnp.setTag('pick_kind', 'cp')
-
+            cnp.setTag("curve_tag", str(self.tag))
+            cnp.setTag("cp_index", str(i))
+            cnp.setTag("pick_kind", "cp")
 
     def _create_collision(self, cnode: NodePath):
         for idxA, idxB in self.edges:
@@ -118,7 +125,6 @@ class CurveApp:
             radius = 0.4
             tube = CollisionTube(ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius)
             cnode.addSolid(tube)
-
 
     def _attachColissionNode(self):
         cnode = CollisionNode(f"col_{self.tag}")
@@ -129,8 +135,8 @@ class CurveApp:
             self.curve_collision_node.removeNode()
         self.curve_collision_node = self.node_path.attachNewNode("curve_collision")
         cnp = self.curve_collision_node.attachNewNode(cnode)
-        cnp.setTag('curve_tag', str(self.tag))
-        cnp.setTag('pick_kind', 'curve')
+        cnp.setTag("curve_tag", str(self.tag))
+        cnp.setTag("pick_kind", "curve")
         return cnp
 
     def _draw_curve(self):
@@ -141,17 +147,15 @@ class CurveApp:
             self._curve_geom_node.removeNode()
         self._curve_geom_node = self.curve_render_node.attachNewNode(lines.create())
 
-
     def attachCuveNode(self, node_path: NodePath):
         self.node_path = node_path
-        self.node_path.setTag('curve_tag', str(self.tag))
+        self.node_path.setTag("curve_tag", str(self.tag))
         self.curve_render_node = self.node_path.attachNewNode("curve_render")
         self._draw_curve()
         self._attachColissionNode()
         if self.control_points is not None:
             self._attachCPNode()
         return self.node_path
-
 
     def set_cp_color(self, cp_index: int, color: list):
         self.cp_color[cp_index] = color
@@ -166,7 +170,6 @@ class CurveApp:
                 self.cp_node.show()
             else:
                 self.cp_node.hide()
-
 
     def draw_curve(self, lines: LineSegs):
         for idxA, idxB in self.edges:
@@ -196,7 +199,7 @@ class CurveApp:
 
         self.control_points[cp_index] = [new_pos[0], new_pos[1], new_pos[2]]
 
-        if self.type == 'bezier' and self.degree is not None:
+        if self.type == "bezier" and self.degree is not None:
             engine = nurbslib.PyBezierCurve(int(self.degree), self.control_points, None)
             self.points = engine.evaluate(100, False)
             self.edges = [(i, i + 1) for i in range(len(self.points) - 1)]
@@ -207,6 +210,3 @@ class CurveApp:
             self._draw_control_points(self.cp_render_node)
         self._attachColissionNode()
         self._rebuild_cp_collision()
-
-
-
