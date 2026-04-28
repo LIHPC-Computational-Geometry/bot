@@ -263,8 +263,8 @@ class TestViewerBezierInteractions(unittest.TestCase):
         # Assertions
         viewer.model.get_end_points_coords.assert_called_once_with(42)
         MockBezierCurve._default_control_points.assert_called_once_with(coords_a, coords_b, degree)
-        MockBezierCurve.assert_called_once_with("42", MockBezierCurve._default_control_points.return_value, degree)
-        viewer.model.set_curve.assert_called_once_with("42", mock_curve_instance)
+        MockBezierCurve.assert_called_once_with(42, MockBezierCurve._default_control_points.return_value, degree)
+        viewer.model.set_curve.assert_called_once_with(42, mock_curve_instance)
 
     def test_bezier_conversion_no_selection(self):
         """Verifies behavior if no curve is selected/hovered."""
