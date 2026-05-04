@@ -5,12 +5,14 @@ These tests cover the parts that do NOT require a file on disk:
 observer pattern, get_render_data structure, add_point side-effects and
 input-validation errors on getClosestPoint / get_adjacent_curves_of_point.
 """
+
 import unittest
 from bot.core.cad import Model as CADModel
 
 
 class _MockObserver:
     """Minimal observer that records every update() call."""
+
     def __init__(self):
         self.calls = []
 
@@ -19,7 +21,6 @@ class _MockObserver:
 
 
 class TestObserverPattern(unittest.TestCase):
-
     def setUp(self):
         self.model = CADModel()
 
@@ -64,7 +65,6 @@ class TestObserverPattern(unittest.TestCase):
 
 
 class TestGetRenderData(unittest.TestCase):
-
     def setUp(self):
         self.model = CADModel()
 
@@ -73,30 +73,29 @@ class TestGetRenderData(unittest.TestCase):
 
     def test_returns_dict_with_required_keys(self):
         data = self.model.get_render_data()
-        self.assertIn('points', data)
-        self.assertIn('edges', data)
-        self.assertIn('bounds', data)
+        self.assertIn("points", data)
+        self.assertIn("edges", data)
+        self.assertIn("bounds", data)
 
     def test_points_and_edges_are_lists(self):
         data = self.model.get_render_data()
-        self.assertIsInstance(data['points'], list)
-        self.assertIsInstance(data['edges'], list)
+        self.assertIsInstance(data["points"], list)
+        self.assertIsInstance(data["edges"], list)
 
     def test_bounds_has_expected_keys(self):
         self.model.open("data/profil_1.geo")
-        bounds = self.model.get_render_data()['bounds']
-        for key in ('min', 'max', 'center', 'size'):
+        bounds = self.model.get_render_data()["bounds"]
+        for key in ("min", "max", "center", "size"):
             self.assertIn(key, bounds)
 
     def test_bounds_are_lists_of_three_floats(self):
         self.model.open("data/profil_1.geo")
-        bounds = self.model.get_render_data()['bounds']
-        for key in ('min', 'max', 'center', 'size'):
+        bounds = self.model.get_render_data()["bounds"]
+        for key in ("min", "max", "center", "size"):
             self.assertEqual(len(bounds[key]), 3)
 
 
 class TestAddPoint(unittest.TestCase):
-
     def setUp(self):
         self.model = CADModel()
 
@@ -122,12 +121,11 @@ class TestAddPoint(unittest.TestCase):
     def test_add_point_updates_bounds(self):
         self.model.add_point([10.0, 20.0, 30.0])
         bounds = self.model.bounds
-        self.assertIn('min', bounds)
-        self.assertIn('max', bounds)
+        self.assertIn("min", bounds)
+        self.assertIn("max", bounds)
 
 
 class TestGetClosestPointValidation(unittest.TestCase):
-
     def setUp(self):
         self.model = CADModel()
         self.model.open("data/profil_1.geo")
@@ -160,5 +158,5 @@ class TestGetClosestPointValidation(unittest.TestCase):
             self.model.getClosestPoint(3, 1, [0, 0, 0])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
