@@ -1,12 +1,21 @@
-from panda3d.core import LineSegs, NodePath, LColor, Vec4, Vec3, DirectionalLight, AmbientLight
+from panda3d.core import (
+    LineSegs,
+    NodePath,
+    LColor,
+    Vec4,
+    Vec3,
+    DirectionalLight,
+    AmbientLight,
+)
 from panda3d.core import CollisionNode, CollisionTube
-from panda3d.core import GeomVertexFormat, GeomVertexData, Geom, GeomPoints, GeomNode, GeomVertexWriter
 
 from bot.view.curve_app import CurveApp
 
 _DEFAULT_BOUNDS = {
-    'min': [0, 0, 0], 'max': [0, 0, 0],
-    'center': [0, 0, 0], 'size': [1, 1, 1],
+    "min": [0, 0, 0],
+    "max": [0, 0, 0],
+    "center": [0, 0, 0],
+    "size": [1, 1, 1],
 }
 
 
@@ -38,7 +47,8 @@ class HUDGizmo:
         for i, col in enumerate([(1, 0, 0), (0, 1, 0), (0, 0, 1)]):
             ls.setColor(LColor(*col, 1))
             ls.moveTo(0, 0, 0)
-            target = [0, 0, 0]; target[i] = 0.1
+            target = [0, 0, 0]
+            target[i] = 0.1
             ls.drawTo(*target)
         self.root.attachNewNode(ls.create())
 
@@ -75,9 +85,9 @@ class Scene:
         """
         self.base = base
         self._geom_data = geom_data
-        self.background_color = settings.get('background_color', [0.1, 0.1, 0.12])
+        self.background_color = settings.get("background_color", [0.1, 0.1, 0.12])
         self.base.set_background_color(self.background_color)
-        self.line_thickness = settings.get('line_thickness', 2)
+        self.line_thickness = settings.get("line_thickness", 2)
         self.curves = {}
         self.active_curve_tag = None
         self.edit_mode_enabled = False
@@ -89,10 +99,14 @@ class Scene:
         self._constraint_guide_visible = False
 
         self.geom_node = self._build_from_data(geom_data)
-        self._constraint_guide_np = self.base.render.attachNewNode("constraint_guide_root")
+        self._constraint_guide_np = self.base.render.attachNewNode(
+            "constraint_guide_root"
+        )
         self._constraint_guide_np.hide()
         self._world_axes_np = self.base.render.attachNewNode("world_axes_root")
-        self._transform_gizmo_np = self.base.render.attachNewNode("transform_gizmo_root")
+        self._transform_gizmo_np = self.base.render.attachNewNode(
+            "transform_gizmo_root"
+        )
         self._transform_gizmo_np.hide()
         self.gizmo = HUDGizmo(self.base.pixel2d)
         self.add_lighting()
@@ -100,12 +114,11 @@ class Scene:
     @property
     def bounds(self) -> dict:
         """Bounding-box data of the current geometry (center, size, min, max)."""
-        return self._geom_data.get('bounds', _DEFAULT_BOUNDS)
+        return self._geom_data.get("bounds", _DEFAULT_BOUNDS)
 
     def _group_edges_by_tag(self, edges: list) -> dict:
         # NOTE: A curve is a liste of small edges. This function group all these edges for set the same color
-        """Groups a list of edges by their curve tag.
-        """
+        """Groups a list of edges by their curve tag."""
         edges_by_tag = {}
         for e in edges:
             idxA, idxB = e[0], e[1]
@@ -118,7 +131,7 @@ class Scene:
     def _create_curve_geometry(self, tag: str, tag_edges: list, points: list):
         """Creates the visible lines and invisible collision nodes for a set of edges."""
         lines = LineSegs()
-        is_control_polygon = tag.endswith('_cp')
+        is_control_polygon = tag.endswith("_cp")
 
         if is_control_polygon:
             lines.setThickness(1.0)
@@ -138,7 +151,9 @@ class Scene:
 
             if not is_control_polygon:
                 radius = 1.0
-                tube = CollisionTube(ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius)
+                tube = CollisionTube(
+                    ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius
+                )
                 cnode.addSolid(tube)
 
         if is_control_polygon:
@@ -166,7 +181,7 @@ class Scene:
             NodePath: The root node containing all visible and collision geometry,
                       attached to `render`. Returns `None` if there are no edges.
         """
-        curves = geom_data.get('curves', [])
+        curves = geom_data.get("curves", [])
 
         self.curves = {}
 
@@ -191,7 +206,7 @@ class Scene:
         else:
             try:
                 curve = self.curves.get(int(tag))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 curve = None
 
         if curve is not None:
@@ -204,7 +219,7 @@ class Scene:
         else:
             try:
                 curve = self.curves.get(int(tag))
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 curve = None
 
         if curve is not None:
@@ -220,7 +235,7 @@ class Scene:
     def set_active_curve(self, tag):
         try:
             normalized = int(tag) if tag is not None else None
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             normalized = None
         self.active_curve_tag = normalized
         for curve_tag, curve in self.curves.items():
@@ -236,31 +251,38 @@ class Scene:
     def set_axis_constraint(self, mask: int):
         self.axis_constraint_mask = max(0, min(7, int(mask)))
         if self._constraint_guide_visible and self._constraint_guide_origin is not None:
-            self.update_axis_guide(self._constraint_guide_origin, self.axis_constraint_mask)
+            self.update_axis_guide(
+                self._constraint_guide_origin, self.axis_constraint_mask
+            )
 
     def _guide_length(self) -> float:
-        size = self.bounds.get('size', [1, 1, 1])
+        size = self.bounds.get("size", [1, 1, 1])
         max_size = max(size) if size else 1
         return max(2.0, float(max_size) * 0.15)
 
     def _world_axes_length(self) -> float:
-        size = self.bounds.get('size', [1, 1, 1])
+        size = self.bounds.get("size", [1, 1, 1])
         max_size = max(size) if size else 1
         return max(1000.0, float(max_size) * 100.0)
 
-    def _draw_axis_line(self, root: NodePath, origin: list[float], axis: str, length: float):
-        colors = {'x': (1, 0, 0, 0.2), 'y': (0, 1, 0, 0.2), 'z': (0, 0, 1, 0.2)}
-        vectors = {'x': (1, 0, 0), 'y': (0, 1, 0), 'z': (0, 0, 1)}
+    def _draw_axis_line(
+        self, root: NodePath, origin: list[float], axis: str, length: float
+    ):
+        colors = {"x": (1, 0, 0, 0.2), "y": (0, 1, 0, 0.2), "z": (0, 0, 1, 0.2)}
+        vectors = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}
         color = colors[axis]
         vx, vy, vz = vectors[axis]
 
         ls = LineSegs()
         ls.setThickness(2)
         ls.setColor(*color)
-        ls.moveTo(origin[0] - vx * length, origin[1] - vy * length, origin[2] - vz * length)
-        ls.drawTo(origin[0] + vx * length, origin[1] + vy * length, origin[2] + vz * length)
+        ls.moveTo(
+            origin[0] - vx * length, origin[1] - vy * length, origin[2] - vz * length
+        )
+        ls.drawTo(
+            origin[0] + vx * length, origin[1] + vy * length, origin[2] + vz * length
+        )
         root.attachNewNode(ls.create())
-
 
     def _update_transform_gizmo(self, origin: list[float], mask: int):
         if self._transform_gizmo_np is None:
@@ -268,11 +290,11 @@ class Scene:
         self._transform_gizmo_np.getChildren().detach()
         length = self._guide_length()
         if mask & 1:
-            self._draw_axis_line(self._transform_gizmo_np, origin, 'x', length)
+            self._draw_axis_line(self._transform_gizmo_np, origin, "x", length)
         if mask & 2:
-            self._draw_axis_line(self._transform_gizmo_np, origin, 'y', length)
+            self._draw_axis_line(self._transform_gizmo_np, origin, "y", length)
         if mask & 4:
-            self._draw_axis_line(self._transform_gizmo_np, origin, 'z', length)
+            self._draw_axis_line(self._transform_gizmo_np, origin, "z", length)
 
     def show_axis_guide(self, origin: list[float], mask: int):
         self._constraint_guide_visible = True
@@ -289,11 +311,11 @@ class Scene:
 
         length = self._guide_length()
         if mask & 1:
-            self._draw_axis_line(self._constraint_guide_np, origin, 'x', length)
+            self._draw_axis_line(self._constraint_guide_np, origin, "x", length)
         if mask & 2:
-            self._draw_axis_line(self._constraint_guide_np, origin, 'y', length)
+            self._draw_axis_line(self._constraint_guide_np, origin, "y", length)
         if mask & 4:
-            self._draw_axis_line(self._constraint_guide_np, origin, 'z', length)
+            self._draw_axis_line(self._constraint_guide_np, origin, "z", length)
         self._update_transform_gizmo(origin, mask)
 
     def hide_axis_guide(self):
@@ -305,7 +327,6 @@ class Scene:
         if self._transform_gizmo_np is not None:
             self._transform_gizmo_np.getChildren().detach()
             self._transform_gizmo_np.hide()
-
 
     def rebuild(self, geom_data: dict):
         """Replace displayed geometry with new render data."""
@@ -328,7 +349,11 @@ class Scene:
         if self._transform_gizmo_np is not None:
             self._transform_gizmo_np.removeNode()
             self._transform_gizmo_np = None
-        if hasattr(self, 'gizmo') and self.gizmo is not None and hasattr(self.gizmo, 'root'):
+        if (
+            hasattr(self, "gizmo")
+            and self.gizmo is not None
+            and hasattr(self.gizmo, "root")
+        ):
             self.gizmo.root.removeNode()
 
     def apply_settings(self, settings: dict):
@@ -340,11 +365,11 @@ class Scene:
         Args:
             settings: Partial or full scene configuration dict.
         """
-        if 'background_color' in settings:
-            self.background_color = settings['background_color']
+        if "background_color" in settings:
+            self.background_color = settings["background_color"]
             self.base.set_background_color(self.background_color)
-        if 'line_thickness' in settings:
-            self.line_thickness = settings['line_thickness']
+        if "line_thickness" in settings:
+            self.line_thickness = settings["line_thickness"]
             if self.geom_node is not None:
                 self.geom_node.removeNode()
             self.geom_node = self._build_from_data(self._geom_data)

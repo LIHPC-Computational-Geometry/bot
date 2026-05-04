@@ -8,6 +8,7 @@ environments.
 
 Note: these tests will briefly open a Panda3D window.
 """
+
 import sys
 import time
 import unittest
@@ -20,6 +21,7 @@ def _has_display() -> bool:
     if sys.platform == "darwin":
         return True  # macOS always has a display
     import os
+
     return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
 
@@ -29,6 +31,7 @@ class TestViewerSubprocessLifecycle(unittest.TestCase):
 
     def _start_viewer(self, model=None):
         from bot.viewer.viewer import Viewer
+
         v = Viewer()
         if model:
             v.connect(model)
@@ -60,6 +63,7 @@ class TestViewerSubprocessLifecycle(unittest.TestCase):
 
     def test_stop_deregisters_observer(self):
         from bot.core.cad import Model as CADModel
+
         model = CADModel()
         model.open("data/profil_1.geo")
         try:
@@ -72,6 +76,7 @@ class TestViewerSubprocessLifecycle(unittest.TestCase):
 
     def test_run_returns_self_for_chaining(self):
         from bot.viewer.viewer import Viewer
+
         v = Viewer()
         result = v.run()
         try:
@@ -90,6 +95,7 @@ class TestViewerIPCWithModel(unittest.TestCase):
     def setUp(self):
         from bot.core.cad import Model as CADModel
         from bot.viewer.viewer import Viewer
+
         self.model = CADModel()
         self.model.open("data/profil_1.geo")
         self.viewer = Viewer()
@@ -116,5 +122,5 @@ class TestViewerIPCWithModel(unittest.TestCase):
         self.assertTrue(self.viewer._process.is_alive())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -3,7 +3,6 @@ from bot.view.utils import ColorGenerator
 
 
 class TestColorGenerator(unittest.TestCase):
-
     def test_returns_correct_number_of_colors(self):
         for n in [1, 3, 10]:
             colors = ColorGenerator.generate_distinct_colors(n)
@@ -35,5 +34,5 @@ class TestColorGenerator(unittest.TestCase):
         self.assertEqual(colors, [])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
