@@ -15,8 +15,10 @@ dependencies = [
 [tool.uv]
 package = true
 
-[tool.uv.sources]
-nurbslib = { path = "ferrispline/nurbslib" }
+# FIXME: will be change, using a path like this isn't good
+# NOTE For find nurbslib in the folder wheel, you can run "uv sync --find-links wheel"
+# [tool.uv.sources]
+# nurbslib = { path = "../vtk_converter/nurbslib", editable = true }
 
 [build-system]
 requires = ["hatchling"]
@@ -24,15 +26,9 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "matplotlib>=3.10.9",
-    "numpy>=2.4.4",
     "pdoc>=16.0.0",
-    "pyqt5>=5.15.11",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
-    "pyvista>=0.47.3",
-    "ruff",
-    "scipy>=1.17.1",
 ]
 
 [tool.pytest.ini_options]

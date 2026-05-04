@@ -8,6 +8,7 @@ remains fully interactive. Data flows through a multiprocessing Pipe
 in the form of serializable dicts.
 """
 
+import math
 import multiprocessing as mp
 import threading
 from typing import Any, Callable, Optional, TYPE_CHECKING
@@ -24,14 +25,12 @@ else:
 # Subprocess entry function (must be at module level for pickle)
 # ---------------------------------------------------------------------------
 
-
 def _viewer_subprocess(conn, config_filename: str):
     """
     Panda3D subprocess entry point.
     Runs on the subprocess main thread → macOS safe.
     """
     import queue as _queue
-
     cmd_queue = _queue.Queue()
 
     # Thread that reads the parent pipe → puts into the internal queue
@@ -40,7 +39,7 @@ def _viewer_subprocess(conn, config_filename: str):
             try:
                 msg = conn.recv()
                 cmd_queue.put(msg)
-                if msg[0] == "exit":  # Exit command
+                if msg[0] == 'exit': # Exit command
                     break
             except EOFError:
                 break
@@ -54,15 +53,13 @@ def _viewer_subprocess(conn, config_filename: str):
             pass
 
     from bot.viewer.app import ViewerApp
-
     app = ViewerApp(config_filename, cmd_queue, on_event)
-    app.run()  # blocking — intentional, it's the main thread of the subprocess
+    app.run()   # blocking — intentional, it's the main thread of the subprocess
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
-
 
 class Viewer:
     """
@@ -85,9 +82,9 @@ class Viewer:
     def __init__(self, config_filename: str = "bot_config.toml"):
         self._config_filename = config_filename
         self.model: Optional[Model] = None
-        self._conn = None  # parent end of the Pipe
-        self._process = None  # Panda3D subprocess
-        self._event_thread = None  # event listening thread
+        self._conn = None           # parent end of the Pipe
+        self._process = None        # Panda3D subprocess
+        self._event_thread = None   # event listening thread
         self._running = False
 
         self._default_last_hovered = None
@@ -99,35 +96,37 @@ class Viewer:
         self.on_cp_drag: Optional[Callable] = None
         self.on_cp_pick_end: Optional[Callable] = self._default_on_cp_pick_end
 
+
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
     def highlight_curve(self, tag: str, color: list) -> "Viewer":
         """Colors the geometry associated with a tag."""
-        self._send("highlight_curve", {"tag": tag, "color": color})
+        self._send('highlight_curve', {'tag': tag, 'color': color})
         return self
 
     def set_hud_text(self, text: str) -> "Viewer":
         """Updates the text displayed in an overlay on the screen."""
-        self._send("update_hud", {"text": text})
+        self._send('update_hud', {'text': text})
         return self
 
     def set_edit_mode(self, enabled: bool, curve_tag: Optional[int] = None) -> "Viewer":
-        self._send("set_edit_mode", {"enabled": enabled, "curve_tag": curve_tag})
+        self._send('set_edit_mode', {'enabled': enabled, 'curve_tag': curve_tag})
         return self
 
     def set_active_curve(self, curve_tag: Optional[int]) -> "Viewer":
-        self._send("set_active_curve", {"curve_tag": curve_tag})
+        self._send('set_active_curve', {'curve_tag': curve_tag})
         return self
 
     def set_axis_constraint(self, mask: int) -> "Viewer":
         try:
             normalized = int(mask)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             normalized = 7
         normalized = max(0, min(7, normalized))
-        self._send("set_axis_constraint", {"mask": normalized})
+        self._send('set_axis_constraint', {'mask': normalized})
         return self
 
     def connect(self, model: Model) -> "Viewer":
@@ -141,7 +140,7 @@ class Viewer:
         self.model = model
         model.add_observer(self)
         if self._conn is not None:
-            self._send("load", model.get_render_data())
+            self._send('load', model.get_render_data())
         return self
 
     def disconnect(self) -> "Viewer":
@@ -158,7 +157,7 @@ class Viewer:
         """
         self._running = True
 
-        ctx = mp.get_context("spawn")
+        ctx = mp.get_context('spawn')
         parent_conn, child_conn = ctx.Pipe()
         self._conn = parent_conn
 
@@ -171,7 +170,7 @@ class Viewer:
         child_conn.close()  # useless in the parent process
 
         if self.model is not None:
-            self._send("load", self.model.get_render_data())
+            self._send('load', self.model.get_render_data())
 
         self._start_event_listener()
         return self
@@ -188,15 +187,15 @@ class Viewer:
         # 2. Send the stop signal to the subprocess
         if self._conn is not None:
             try:
-                self._send("exit", None)
-            except:  # noqa: E722
+                self._send('exit', None)
+            except:
                 pass
 
         # 3. Wait for the process to finish
         if self._process is not None:
-            self._process.join(timeout=2.0)  # We allow 2 seconds to close
+            self._process.join(timeout=2.0) # We allow 2 seconds to close
             if self._process.is_alive():
-                self._process.terminate()  # Brute force if still alive
+                self._process.terminate() # Brute force if still alive
             self._process = None
 
         # 4. Close communication
@@ -206,14 +205,13 @@ class Viewer:
 
         self._event_thread = None
         print("Stopped Viewer")
-
     # ------------------------------------------------------------------
     # Observer callback (called by Model when state changes)
     # ------------------------------------------------------------------
 
     def update(self, model: Model):
         """Called by the Model through the observer pattern when geometry changes."""
-        self._send("update", model.get_render_data())
+        self._send('update', model.get_render_data())
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -229,34 +227,24 @@ class Viewer:
 
     def _start_event_listener(self):
         """Lightweight thread that receives events from the subprocess (e.g., picking)."""
-
         def _listen():
             while self._running:
                 try:
                     if self._conn.poll(0.1):
                         event_type, data = self._conn.recv()
-                        if event_type == "pick" and self.on_pick is not None:
+                        if event_type == 'pick' and self.on_pick is not None:
                             self.on_pick(data)
-                        elif event_type == "hover" and self.on_hover is not None:
+                        elif event_type == 'hover' and self.on_hover is not None:
                             self.on_hover(data)
-                        elif (
-                            event_type == "curve_selected"
-                            and self.on_curve_selected is not None
-                        ):
+                        elif event_type == 'curve_selected' and self.on_curve_selected is not None:
                             self.on_curve_selected(data)
-                        elif (
-                            event_type == "cp_pick_start"
-                            and self.on_cp_pick_start is not None
-                        ):
+                        elif event_type == 'cp_pick_start' and self.on_cp_pick_start is not None:
                             self.on_cp_pick_start(data)
-                        elif event_type == "cp_drag" and self.on_cp_drag is not None:
+                        elif event_type == 'cp_drag' and self.on_cp_drag is not None:
                             self.on_cp_drag(data)
-                        elif (
-                            event_type == "cp_pick_end"
-                            and self.on_cp_pick_end is not None
-                        ):
+                        elif event_type == 'cp_pick_end' and self.on_cp_pick_end is not None:
                             self.on_cp_pick_end(data)
-                except EOFError, BrokenPipeError, AttributeError:
+                except (EOFError, BrokenPipeError, AttributeError):
                     break
                 except Exception:
                     pass
@@ -285,7 +273,7 @@ class Viewer:
                     pt_a = f"({coords_a[0]:.2f}, {coords_a[1]:.2f}, {coords_a[2]:.2f})"
                     pt_b = f"({coords_b[0]:.2f}, {coords_b[1]:.2f}, {coords_b[2]:.2f})"
 
-                    info_text += "Type: Segment linéaire\n"
+                    info_text += f"Type: Segment linéaire\n"
                     info_text += f"Extrémité A: {pt_a}\n"
                     info_text += f"Extrémité B: {pt_b}"
 
@@ -309,7 +297,7 @@ class Viewer:
             return
         try:
             normalized = int(tag)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return
         self.set_edit_mode(True, normalized)
         self.set_active_curve(normalized)
@@ -319,9 +307,9 @@ class Viewer:
         if self.model is None or data is None:
             return
         try:
-            tag = int(data["tag"])
-            cp_index = int(data["cp_index"])
-            world_pos = data.get("world_pos")
+            tag = int(data['tag'])
+            cp_index = int(data['cp_index'])
+            world_pos = data.get('world_pos')
             if world_pos is None:
                 return
             self.model.update_control_point(tag, cp_index, world_pos)
@@ -333,9 +321,7 @@ class Viewer:
             tag = int(self._default_last_hovered)
             if self.model is not None:
                 coords_a, coords_b = self.model.get_end_points_coords(int(tag))
-                control_points = BezierCurve._default_control_points(
-                    coords_a, coords_b, degree
-                )
+                control_points = BezierCurve._default_control_points(coords_a, coords_b, degree)
                 curve = BezierCurve(tag, control_points, degree)
                 self.model.set_curve(tag, curve)
             else:
@@ -346,8 +332,6 @@ class Viewer:
     def move_control_point(self, tag: int, cp_index: int, new_pos: list[float]):
         if self.model is not None:
             self.model.update_control_point(tag, cp_index, new_pos)
-            self.set_hud_text(
-                f"Point de contrôle {cp_index} de la courbe {tag} déplacé."
-            )
+            self.set_hud_text(f"Point de contrôle {cp_index} de la courbe {tag} déplacé.")
         else:
             self.set_hud_text("Aucun modèle chargé.")

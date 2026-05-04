@@ -6,9 +6,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-        with:
-          submodules: true
+      - uses: actions/checkout@v4
 
       # for gmsh and panda3D
       - name: Install system graphics dependencies
@@ -16,34 +14,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libglu1-mesa libgl1-mesa-dev libosmesa6
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "ferrispline"
-
       - name: Install uv
         uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
 
       - name: Set up Python
         run: uv python install
 
       - name: Install dependencies
-        run: uv sync --all-extras --dev
+        run: uv sync --all-extras --dev --find-links wheel/
 
       - name: Run tests with coverage
         # On génère un rapport XML pour Codecov
         run: uv run pytest --cov=. --cov-report=xml
 
-      # FIXME: need access to the organization
-      # - name: Upload coverage to Codecov
-      #   uses: codecov/codecov-action@v4
-      #   with:
-      #     token: ${{ secrets.CODECOV_TOKEN }}
-      #     file: ./coverage.xml
-      #     fail_ci_if_error: true
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          fail_ci_if_error: true

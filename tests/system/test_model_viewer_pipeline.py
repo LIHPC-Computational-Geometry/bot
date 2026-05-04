@@ -8,9 +8,8 @@ The subprocess is not started (no Panda3D / no display required).  The real pipe
 endpoint is replaced by a spy so we can assert on what would have been transmitted
 to the rendering process.
 """
-
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 from bot.core.cad import Model as CADModel
 from bot.viewer.viewer import Viewer
@@ -41,22 +40,22 @@ class TestViewerReceivesLoad(unittest.TestCase):
         viewer.connect(self.model)
         spy.send.assert_called_once()
         cmd, data = spy.send.call_args[0][0]
-        self.assertEqual(cmd, "load")
+        self.assertEqual(cmd, 'load')
 
     def test_load_payload_contains_points_and_edges(self):
         viewer, spy = _make_spied_viewer()
         viewer.connect(self.model)
         _, data = spy.send.call_args[0][0]
-        self.assertIn("points", data)
-        self.assertIn("edges", data)
-        self.assertGreater(len(data["points"]), 0)
-        self.assertGreater(len(data["edges"]), 0)
+        self.assertIn('points', data)
+        self.assertIn('edges', data)
+        self.assertGreater(len(data['points']), 0)
+        self.assertGreater(len(data['edges']), 0)
 
     def test_load_payload_contains_bounds(self):
         viewer, spy = _make_spied_viewer()
         viewer.connect(self.model)
         _, data = spy.send.call_args[0][0]
-        self.assertIn("bounds", data)
+        self.assertIn('bounds', data)
 
 
 class TestViewerReceivesUpdate(unittest.TestCase):
@@ -67,7 +66,7 @@ class TestViewerReceivesUpdate(unittest.TestCase):
         self.model.open(GEO_FILE)
         self.viewer, self.spy = _make_spied_viewer()
         self.viewer.connect(self.model)
-        self.spy.reset_mock()  # ignore the initial 'load' call
+        self.spy.reset_mock()   # ignore the initial 'load' call
 
     def tearDown(self):
         self.model.finalize()
@@ -76,14 +75,14 @@ class TestViewerReceivesUpdate(unittest.TestCase):
         self.model.add_point([50.0, 50.0, 0.0])
         self.spy.send.assert_called_once()
         cmd, _ = self.spy.send.call_args[0][0]
-        self.assertEqual(cmd, "update")
+        self.assertEqual(cmd, 'update')
 
     def test_update_payload_is_consistent_render_data(self):
         self.model.add_point([50.0, 50.0, 0.0])
         _, data = self.spy.send.call_args[0][0]
-        self.assertIn("points", data)
-        self.assertIn("edges", data)
-        self.assertIn("bounds", data)
+        self.assertIn('points', data)
+        self.assertIn('edges', data)
+        self.assertIn('bounds', data)
 
     def test_multiple_mutations_each_trigger_update(self):
         for x in [10.0, 20.0, 30.0]:
@@ -91,7 +90,7 @@ class TestViewerReceivesUpdate(unittest.TestCase):
         self.assertEqual(3, self.spy.send.call_count)
         for c in self.spy.send.call_args_list:
             cmd, _ = c[0][0]
-            self.assertEqual(cmd, "update")
+            self.assertEqual(cmd, 'update')
 
 
 class TestMultipleViewers(unittest.TestCase):
@@ -169,5 +168,5 @@ class TestViewerStopCleansUp(unittest.TestCase):
         spy.send.assert_not_called()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

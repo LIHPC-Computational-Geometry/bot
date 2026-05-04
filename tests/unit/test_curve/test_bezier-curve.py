@@ -4,7 +4,6 @@ Unit tests for bot.core.curve.BezierCurve.
 The external Rust dependency (nurbslib) is mocked to allow testing the
 Python bridge and logic without requiring the compiled engine.
 """
-
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -12,7 +11,8 @@ from bot.core.curve import BezierCurve
 
 
 class TestBezierCurve(unittest.TestCase):
-    @patch("bot.core.curve.nurbslib")
+
+    @patch('bot.core.curve.nurbslib')
     def test_initialization_and_attributes(self, mock_nurbslib):
         """Tests the initialization of the curve and access to its basic attributes."""
         # 1. Data preparation
@@ -35,9 +35,7 @@ class TestBezierCurve(unittest.TestCase):
         self.assertEqual(curve.get_degree(), degree)
 
         # Ensure the Rust engine was called with the correct arguments
-        mock_nurbslib.PyBezierCurve.assert_called_once_with(
-            degree, control_points, None
-        )
+        mock_nurbslib.PyBezierCurve.assert_called_once_with(degree, control_points, None)
 
     def test_default_control_points_default_degree(self):
         """Tests that the method uses default degree 3 if not specified."""
@@ -52,7 +50,7 @@ class TestBezierCurve(unittest.TestCase):
             [0.0, 0.0, 0.0],
             [10.0, 0.0, 0.0],
             [20.0, 0.0, 0.0],
-            [30.0, 0.0, 0.0],
+            [30.0, 0.0, 0.0]
         ]
         self.assertEqual(len(pts), 4)
         self.assertEqual(pts, expected_pts)
@@ -67,7 +65,11 @@ class TestBezierCurve(unittest.TestCase):
         pts = BezierCurve._default_control_points(coords_a, coords_b, degree)
 
         # We expect 3 points: point A, middle point, and point B
-        expected_pts = [[0.0, 0.0, 0.0], [5.0, 0.0, 0.0], [10.0, 0.0, 0.0]]
+        expected_pts = [
+            [0.0, 0.0, 0.0],
+            [5.0, 0.0, 0.0],
+            [10.0, 0.0, 0.0]
+        ]
         self.assertEqual(pts, expected_pts)
 
     def test_default_control_points_count(self):
@@ -91,7 +93,7 @@ class TestBezierCurve(unittest.TestCase):
         self.assertEqual(len(pts), 1)
         self.assertEqual(pts[0], coords_a)
 
-    @patch("bot.core.curve.nurbslib")
+    @patch('bot.core.curve.nurbslib')
     def test_get_render_data(self, mock_nurbslib):
         """Tests the structure and content of the render dictionary (used by the viewer)."""
         tag = "42"
@@ -113,20 +115,20 @@ class TestBezierCurve(unittest.TestCase):
         data = curve.get_render_data()
 
         # Verification of the presence of all required keys
-        self.assertIn("tag", data)
-        self.assertIn("control_points", data)
-        self.assertIn("degree", data)
-        self.assertIn("curve", data)
+        self.assertIn('tag', data)
+        self.assertIn('control_points', data)
+        self.assertIn('degree', data)
+        self.assertIn('curve', data)
 
         # Verifications of values
-        self.assertEqual(data["tag"], "42")
-        self.assertEqual(data["control_points"], control_points)
-        self.assertEqual(data["degree"], degree)
-        self.assertEqual(data["curve"], mock_curve_eval)
+        self.assertEqual(data['tag'], "42")
+        self.assertEqual(data['control_points'], control_points)
+        self.assertEqual(data['degree'], degree)
+        self.assertEqual(data['curve'], mock_curve_eval)
 
         # Ensure the engine was called to generate 100 points
         mock_engine_instance.evaluate.assert_called_once_with(100, False)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

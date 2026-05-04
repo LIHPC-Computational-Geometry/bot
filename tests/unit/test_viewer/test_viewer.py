@@ -4,14 +4,12 @@ Unit tests for bot.viewer.viewer.Viewer.
 The subprocess and multiprocessing pipe are fully mocked so these tests
 run without Panda3D or a display.
 """
-
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 
 
 class _FakeModel:
     """Minimal Model stand-in for observer-registration tests."""
-
     def __init__(self):
         self._observers = []
 
@@ -22,13 +20,13 @@ class _FakeModel:
         self._observers.remove(obs)
 
     def get_render_data(self):
-        return {"points": [], "edges": [], "bounds": {}}
+        return {'points': [], 'edges': [], 'bounds': {}}
 
 
 class TestViewerConnect(unittest.TestCase):
+
     def _make_viewer(self):
         from bot.viewer.viewer import Viewer
-
         return Viewer()
 
     def test_connect_registers_viewer_as_observer(self):
@@ -61,9 +59,9 @@ class TestViewerConnect(unittest.TestCase):
 
 
 class TestViewerDisconnect(unittest.TestCase):
+
     def _make_viewer(self):
         from bot.viewer.viewer import Viewer
-
         return Viewer()
 
     def test_disconnect_removes_observer(self):
@@ -94,9 +92,9 @@ class TestViewerDisconnect(unittest.TestCase):
 
 
 class TestViewerUpdate(unittest.TestCase):
+
     def _make_viewer(self):
         from bot.viewer.viewer import Viewer
-
         return Viewer()
 
     def test_update_sends_render_data_over_pipe(self):
@@ -108,7 +106,9 @@ class TestViewerUpdate(unittest.TestCase):
 
         viewer.update(model)
 
-        mock_conn.send.assert_called_once_with(("update", model.get_render_data()))
+        mock_conn.send.assert_called_once_with(
+            ('update', model.get_render_data())
+        )
 
     def test_update_ignores_broken_pipe(self):
         viewer = self._make_viewer()
@@ -129,17 +129,17 @@ class TestViewerUpdate(unittest.TestCase):
 
 
 class TestViewerSend(unittest.TestCase):
+
     def _make_viewer(self):
         from bot.viewer.viewer import Viewer
-
         return Viewer()
 
     def test_send_transmits_command(self):
         viewer = self._make_viewer()
         mock_conn = MagicMock()
         viewer._conn = mock_conn
-        viewer._send("load", {"points": []})
-        mock_conn.send.assert_called_once_with(("load", {"points": []}))
+        viewer._send('load', {'points': []})
+        mock_conn.send.assert_called_once_with(('load', {'points': []}))
 
     def test_send_silences_broken_pipe(self):
         viewer = self._make_viewer()
@@ -147,13 +147,12 @@ class TestViewerSend(unittest.TestCase):
         mock_conn.send.side_effect = BrokenPipeError
         viewer._conn = mock_conn
         # Should not raise
-        viewer._send("load", {})
+        viewer._send('load', {})
 
     def test_send_noop_when_no_connection(self):
         viewer = self._make_viewer()
         # No exception expected
-        viewer._send("load", {})
-
+        viewer._send('load', {})
 
 class TestViewerDefaultOnHover(unittest.TestCase):
     """Tests pour le comportement par défaut au survol (HUD et surbrillance)."""
@@ -161,7 +160,6 @@ class TestViewerDefaultOnHover(unittest.TestCase):
     def _make_viewer_with_mocks(self):
         """Crée un Viewer avec tous les mocks nécessaires pour tester l'interface."""
         from bot.viewer.viewer import Viewer
-
         viewer = Viewer()
 
         viewer._conn = MagicMock()
@@ -181,9 +179,7 @@ class TestViewerDefaultOnHover(unittest.TestCase):
         viewer._default_on_hover(None)
 
         viewer.highlight_curve.assert_called_once_with("2", [1, 1, 1, 1])
-        viewer.set_hud_text.assert_called_once_with(
-            "Prêt. Survolez ou cliquez sur les courbes."
-        )
+        viewer.set_hud_text.assert_called_once_with("Prêt. Survolez ou cliquez sur les courbes.")
         self.assertIsNone(viewer._default_last_hovered)
 
     def test_default_on_hover_invalid_tag(self):
@@ -197,10 +193,7 @@ class TestViewerDefaultOnHover(unittest.TestCase):
     def test_default_on_hover_valid_tag(self):
         viewer = self._make_viewer_with_mocks()
 
-        viewer.model.get_end_points_coords.return_value = [
-            [0.0, 0.0, 0.0],
-            [1.0, 1.0, 1.0],
-        ]
+        viewer.model.get_end_points_coords.return_value = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
 
         viewer._default_on_hover("1")
 
@@ -219,10 +212,7 @@ class TestViewerDefaultOnHover(unittest.TestCase):
         viewer = self._make_viewer_with_mocks()
         viewer._default_last_hovered = "1"
 
-        viewer.model.get_end_points_coords.return_value = [
-            [0.0, 0.0, 0.0],
-            [1.0, 1.0, 1.0],
-        ]
+        viewer.model.get_end_points_coords.return_value = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
 
         viewer._default_on_hover("3")
 
@@ -230,14 +220,12 @@ class TestViewerDefaultOnHover(unittest.TestCase):
         viewer.highlight_curve.assert_any_call("3", [1, 0.5, 0, 1])
         self.assertEqual(viewer._default_last_hovered, "3")
 
-
 class TestViewerBezierInteractions(unittest.TestCase):
     """Tests for Bezier curve modification interactions via the Viewer."""
 
     def _make_viewer_with_mocks(self):
         """Creates a Viewer with all necessary mocks."""
         from bot.viewer.viewer import Viewer
-
         viewer = Viewer()
 
         # Mock connection and HUD text display
@@ -249,7 +237,8 @@ class TestViewerBezierInteractions(unittest.TestCase):
 
         return viewer
 
-    @patch("bot.viewer.viewer.BezierCurve")
+
+    @patch('bot.viewer.viewer.BezierCurve')
     def test_bezier_conversion_success(self, MockBezierCurve):
         """Verifies the conversion of a classic curve into a Bezier curve."""
         viewer = self._make_viewer_with_mocks()
@@ -262,12 +251,7 @@ class TestViewerBezierInteractions(unittest.TestCase):
         viewer.model.get_end_points_coords.return_value = [coords_a, coords_b]
 
         # Mock configuration for the static method _default_control_points
-        MockBezierCurve._default_control_points.return_value = [
-            coords_a,
-            [3.3, 0, 0],
-            [6.6, 0, 0],
-            coords_b,
-        ]
+        MockBezierCurve._default_control_points.return_value = [coords_a, [3.3, 0, 0], [6.6, 0, 0], coords_b]
 
         # Configuration of the mocked instance returned by BezierCurve(...)
         mock_curve_instance = MagicMock()
@@ -278,13 +262,9 @@ class TestViewerBezierInteractions(unittest.TestCase):
 
         # Assertions
         viewer.model.get_end_points_coords.assert_called_once_with(42)
-        MockBezierCurve._default_control_points.assert_called_once_with(
-            coords_a, coords_b, degree
-        )
-        MockBezierCurve.assert_called_once_with(
-            42, MockBezierCurve._default_control_points.return_value, degree
-        )
-        viewer.model.set_curve.assert_called_once_with(42, mock_curve_instance)
+        MockBezierCurve._default_control_points.assert_called_once_with(coords_a, coords_b, degree)
+        MockBezierCurve.assert_called_once_with("42", MockBezierCurve._default_control_points.return_value, degree)
+        viewer.model.set_curve.assert_called_once_with("42", mock_curve_instance)
 
     def test_bezier_conversion_no_selection(self):
         """Verifies behavior if no curve is selected/hovered."""
@@ -294,9 +274,7 @@ class TestViewerBezierInteractions(unittest.TestCase):
         viewer.bezier_conversion(3)
 
         # Verification of the HUD error
-        viewer.set_hud_text.assert_called_once_with(
-            "Impossible to convert: no curve selected"
-        )
+        viewer.set_hud_text.assert_called_once_with("Impossible to convert: no curve selected")
         # Verifies the model was not called
         viewer.model.get_end_points_coords.assert_not_called()
 
@@ -309,9 +287,8 @@ class TestViewerBezierInteractions(unittest.TestCase):
         viewer.bezier_conversion(3)
 
         # Verification of the HUD error
-        viewer.set_hud_text.assert_called_once_with(
-            "Impossible to convert: no model loaded"
-        )
+        viewer.set_hud_text.assert_called_once_with("Impossible to convert: no model loaded")
+
 
     def test_move_control_point_success(self):
         """Verifies that the modification of a control point is correctly transmitted to the model."""
@@ -324,13 +301,9 @@ class TestViewerBezierInteractions(unittest.TestCase):
         viewer.move_control_point(tag, cp_index, new_pos)
 
         # Verifies the model is updated
-        viewer.model.update_control_point.assert_called_once_with(
-            tag, cp_index, new_pos
-        )
+        viewer.model.update_control_point.assert_called_once_with(tag, cp_index, new_pos)
         # Verifies the success message in the HUD
-        viewer.set_hud_text.assert_called_once_with(
-            f"Point de contrôle {cp_index} de la courbe {tag} déplacé."
-        )
+        viewer.set_hud_text.assert_called_once_with(f"Point de contrôle {cp_index} de la courbe {tag} déplacé.")
 
     def test_move_control_point_no_model(self):
         """Verifies behavior if attempting to move a point without a connected model."""
@@ -344,9 +317,9 @@ class TestViewerBezierInteractions(unittest.TestCase):
 
 
 class TestViewerCurveEditMode(unittest.TestCase):
+
     def _make_viewer(self):
         from bot.viewer.viewer import Viewer
-
         viewer = Viewer()
         viewer._conn = MagicMock()
         return viewer
@@ -354,24 +327,22 @@ class TestViewerCurveEditMode(unittest.TestCase):
     def test_set_edit_mode_sends_command(self):
         viewer = self._make_viewer()
         viewer.set_edit_mode(True, 7)
-        viewer._conn.send.assert_called_with(
-            ("set_edit_mode", {"enabled": True, "curve_tag": 7})
-        )
+        viewer._conn.send.assert_called_with(('set_edit_mode', {'enabled': True, 'curve_tag': 7}))
 
     def test_set_active_curve_sends_command(self):
         viewer = self._make_viewer()
         viewer.set_active_curve(9)
-        viewer._conn.send.assert_called_with(("set_active_curve", {"curve_tag": 9}))
+        viewer._conn.send.assert_called_with(('set_active_curve', {'curve_tag': 9}))
 
     def test_set_axis_constraint_sends_command(self):
         viewer = self._make_viewer()
         viewer.set_axis_constraint(6)
-        viewer._conn.send.assert_called_with(("set_axis_constraint", {"mask": 6}))
+        viewer._conn.send.assert_called_with(('set_axis_constraint', {'mask': 6}))
 
     def test_set_axis_constraint_clamps_invalid_value(self):
         viewer = self._make_viewer()
         viewer.set_axis_constraint("oops")
-        viewer._conn.send.assert_called_with(("set_axis_constraint", {"mask": 7}))
+        viewer._conn.send.assert_called_with(('set_axis_constraint', {'mask': 7}))
 
     def test_default_on_curve_selected_enables_edit_mode(self):
         viewer = self._make_viewer()
@@ -389,12 +360,9 @@ class TestViewerCurveEditMode(unittest.TestCase):
         viewer = self._make_viewer()
         viewer.model = MagicMock()
 
-        viewer._default_on_cp_pick_end(
-            {"tag": "4", "cp_index": 2, "world_pos": [1.0, 2.0, 3.0]}
-        )
+        viewer._default_on_cp_pick_end({'tag': '4', 'cp_index': 2, 'world_pos': [1.0, 2.0, 3.0]})
 
         viewer.model.update_control_point.assert_called_once_with(4, 2, [1.0, 2.0, 3.0])
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

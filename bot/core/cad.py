@@ -5,17 +5,15 @@ from pathlib import Path
 """"global value to indicate how to round floating numbers"""
 nb_digit_rounding = 4
 
-
 class Model:
     """
     The geometric model provides simple and basic function to load geometric files and to query a geometric model
     based on the OpenCascade technology. To do so, we totally rely on the gmsh library.
     """
-
     def __init__(self):
         self.initialize()
         self._observers = []
-        self.bounds = {"min": [0, 0, 0], "max": [0, 0, 0]}
+        self.bounds = {'min': [0,0,0], 'max': [0,0,0]}
         self.curves = {}
 
     def set_curve(self, tag: int, curve_object):
@@ -60,7 +58,7 @@ class Model:
         """
         gmsh.finalize()
 
-    def open(self, filename):
+    def open(self,filename):
         """
         core.cad.Model.open(filename)
 
@@ -71,7 +69,7 @@ class Model:
         - `filename`: string
         """
         if Path(filename).suffix == ".geo":
-            gmsh.open(filename)
+                gmsh.open(filename)
         else:
             gmsh.model.occ.importShapes(filename)
 
@@ -83,22 +81,16 @@ class Model:
         node_tags, coords, _ = gmsh.model.mesh.getNodes()
         # The map will be used later to store some geom info
         # node_map = {tag: i for i, tag in enumerate(node_tags)}
-        self.points = [
-            (coords[i], coords[i + 1], coords[i + 2]) for i in range(0, len(coords), 3)
-        ]
+        self.points = [(coords[i], coords[i+1], coords[i+2]) for i in range(0, len(coords), 3)]
         if not self.points:
             return
-        # Compute now the bounds for automatic rescaling
+        #Compute now the bounds for automatic rescaling
         xs, ys, zs = zip(*self.points)
         self.bounds = {
-            "min": [min(xs), min(ys), min(zs)],
-            "max": [max(xs), max(ys), max(zs)],
-            "center": [
-                (min(xs) + max(xs)) / 2,
-                (min(ys) + max(ys)) / 2,
-                (min(zs) + max(zs)) / 2,
-            ],
-            "size": [max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs)],
+            'min': [min(xs), min(ys), min(zs)],
+            'max': [max(xs), max(ys), max(zs)],
+            'center': [(min(xs)+max(xs))/2, (min(ys)+max(ys))/2, (min(zs)+max(zs))/2],
+            'size': [max(xs)-min(xs), max(ys)-min(ys), max(zs)-min(zs)],
         }
 
     def get_render_data(self) -> dict:
@@ -109,7 +101,7 @@ class Model:
 
         node_tags, coords, _ = gmsh.model.mesh.getNodes()
         node_id_to_coords = {
-            tag: (coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2])
+            tag: (coords[i*3], coords[i*3+1], coords[i*3+2])
             for i, tag in enumerate(node_tags)
         }
 
@@ -128,48 +120,44 @@ class Model:
             local_edges = []
 
             for i in range(0, len(connectivity), 2):
-                for node_tag in (connectivity[i], connectivity[i + 1]):
+                for node_tag in (connectivity[i], connectivity[i+1]):
                     if node_tag not in seen:
                         seen[node_tag] = len(local_points)
                         local_points.append(node_id_to_coords[node_tag])
-                local_edges.append((seen[connectivity[i]], seen[connectivity[i + 1]]))
+                local_edges.append((seen[connectivity[i]], seen[connectivity[i+1]]))
 
             curve_entry = {
-                "points": local_points,
-                "edges": local_edges,
-                "type": "linear",
+                'points': local_points,
+                'edges': local_edges,
+                'type': 'linear',
             }
 
             # Surcharge si courbe paramétrique connue
             if tag in self.curves:
                 custom = self.curves[tag]
                 render = custom.get_render_data()
-                curve_entry.update(
-                    {
-                        "type": "bezier",
-                        "degree": render["degree"],
-                        "control_points": render["control_points"],
-                        "cp_edges": [
-                            (i, i + 1) for i in range(len(render["control_points"]) - 1)
-                        ],
-                        "points": render["curve"],  # écrase les pts gmsh
-                        "edges": [(i, i + 1) for i in range(len(render["curve"]) - 1)],
-                    }
-                )
+                curve_entry.update({
+                    'type': 'bezier',
+                    'degree': render['degree'],
+                    'control_points': render['control_points'],
+                    'cp_edges': [(i, i+1) for i in range(len(render['control_points'])-1)],
+                    'points': render['curve'],   # écrase les pts gmsh
+                    'edges': [(i, i+1) for i in range(len(render['curve'])-1)],
+                })
 
             curves_data[str(tag)] = curve_entry
 
             # Backward-compatible flattened payload expected by existing tests/viewers.
             offset = len(flat_points)
-            flat_points.extend(curve_entry["points"])
-            for idx_a, idx_b in curve_entry["edges"]:
+            flat_points.extend(curve_entry['points'])
+            for idx_a, idx_b in curve_entry['edges']:
                 flat_edges.append((offset + idx_a, offset + idx_b, int(tag)))
 
         return {
-            "points": flat_points,
-            "edges": flat_edges,
-            "curves": curves_data,
-            "bounds": dict(self.bounds),
+            'points': flat_points,
+            'edges': flat_edges,
+            'curves': curves_data,
+            'bounds': dict(self.bounds),
         }
 
     def add_point(self, coords: list, mesh_size: float = 1.0) -> int:
@@ -188,12 +176,13 @@ class Model:
 
     def __synchronize(self):
         """
-        core.cad.Model.synchronize()
+       core.cad.Model.synchronize()
 
-         This operation must be invocated after applying geometric operations to be sure to have a consistent state.
-         We advise to call this method before starting the meshing stage.
+        This operation must be invocated after applying geometric operations to be sure to have a consistent state.
+        We advise to call this method before starting the meshing stage.
         """
         gmsh.model.occ.synchronize()
+
 
     def __get_cell_tags(self, dim):
         """
@@ -219,6 +208,7 @@ class Model:
             tags.append(j)
         return tags
 
+
     def get_point_tags(self):
         """
         core.cad.Model.get_point_tags(dim)
@@ -243,7 +233,8 @@ class Model:
         """
         return self.__get_cell_tags(2)
 
-    def getClosestPoint(self, dim, tag, coord):
+
+    def getClosestPoint(self,dim, tag, coord):
         """
         core.cad.Model.getClosestPoint(dim, tag, coord)
 
@@ -265,22 +256,15 @@ class Model:
             raise TypeError("the dimension parameter (dim) must be an int.")
         if not isinstance(tag, int):
             raise TypeError("the tag parameter (tag) must be an int.")
-        if (
-            not isinstance(coord, (list, tuple))
-            or len(coord) % 3 != 0
-            or not all(isinstance(x, numbers.Real) for x in coord)
-        ):
-            raise TypeError(
-                "the coord parameter must be a list or tuple of 3 real numbers."
-            )
+        if not isinstance(coord, (list, tuple)) or len(coord)%3 != 0 or not all(
+                isinstance(x, numbers.Real) for x in coord):
+            raise TypeError("the coord parameter must be a list or tuple of 3 real numbers.")
         if dim < 1 or dim > 2:
-            raise ValueError(
-                "the dim parameter must be an int comprised between 1 and 2."
-            )
+            raise ValueError("the dim parameter must be an int comprised between 1 and 2.")
 
         return gmsh.model.getClosestPoint(dim, tag, coord)[0]
 
-    def get_end_points(self, curve_tag):
+    def get_end_points(self,curve_tag):
         """
         core.cad.Model.get_end_points(curve_tag)
 
@@ -293,7 +277,7 @@ class Model:
     def get_adjacent_curves_of_point(self, point_tag):
 
         # We check if the tag is an existing point tag
-        if point_tag not in self.get_point_tags():
+        if not point_tag in self.get_point_tags() :
             raise ValueError("Invalid point tag")
 
         curves = []
@@ -301,9 +285,9 @@ class Model:
         for curve_tag in self.get_curve_tags():
             # get curve end points
             end_points = self.get_end_points(curve_tag)
-            if end_points[0] == point_tag:
+            if end_points[0] == point_tag :
                 curves.append(curve_tag)
-            elif end_points[1] == point_tag:
+            elif end_points[1] == point_tag :
                 curves.append(curve_tag)
         return curves
 
@@ -396,10 +380,13 @@ class Model:
         # Get all the entities of dim 1
         elem_types, elem_tags, elem_node_tags = gmsh.model.mesh.getElements(dim=1)
 
+
         # On transforme la liste plate [x,y,z,x,y,z] en liste de tuples [(x,y,z), ...]
         points_3d = []
         for i in range(0, len(coords), 3):
-            points_3d.append((coords[i], coords[i + 1], coords[i + 2]))
+            points_3d.append((coords[i], coords[i+1], coords[i+2]))
+
+
 
         # 2. Liste finale des données
         # Structure : (index_sommet_A, index_sommet_B, tag_courbe_origine)
@@ -409,7 +396,7 @@ class Model:
         entities = gmsh.model.getEntities(1)
 
         for entity in entities:
-            curve_tag = entity[1]  # C'est le Tag de la courbe CAO
+            curve_tag = entity[1] # C'est le Tag de la courbe CAO
 
             # Récupérer les éléments (segments) appartenant UNIQUEMENT à cette courbe
             _, _, node_tags_per_elem = gmsh.model.mesh.getElements(1, curve_tag)
@@ -420,7 +407,7 @@ class Model:
                 # Parcourir les nœuds par paires pour former les arêtes
                 for i in range(0, len(connectivity), 2):
                     tag_a = connectivity[i]
-                    tag_b = connectivity[i + 1]
+                    tag_b = connectivity[i+1]
 
                     # Conversion en indices (0, 1, 2...) pour Panda3D
                     idx_a = node_id_to_index[tag_a]
@@ -440,31 +427,29 @@ class Model:
         gmsh.model.mesh.generate(2)
         # Get mesh nodes
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        num_nodes = len(node_tags)
         node_coords_3d = list(zip(*(iter(node_coords),) * 3))  # (x, y, z) tuples
 
-        # NOTE: Build a node_id -> (x, y, z) map for later use
-        node_map = dict(zip(node_tags, node_coords_3d))  # noqa: F841
+        # Build a node_id -> (x, y, z) map for later use
+        node_map = dict(zip(node_tags, node_coords_3d))
 
         # === 2. Get all face elements (triangles & quads) ===
         surfaces = []
         # type 1 = edge, type 2 = triangle, type 15 = point
         surf_tags = self.get_surface_tags()
         for i in surf_tags:
-            element_types, element_tags, node_tags_list = gmsh.model.mesh.getElements(
-                2, i
-            )
-            faces = []
+            element_types, element_tags, node_tags_list = gmsh.model.mesh.getElements(2, i)
+            faces=[]
             for elem_tags, elem_node_tags in zip(element_tags, node_tags_list):
                 for i in range(len(elem_tags)):
-                    node_ids = [nid - 1 for nid in elem_node_tags[i * 3 : (i + 1) * 3]]
+                    elem_id = elem_tags[i]
+                    node_ids = [nid - 1 for nid in elem_node_tags[i * 3: (i + 1) * 3]]
                     faces.append(node_ids)
             surfaces.append(faces)
 
         return node_coords_3d, surfaces
 
-    def update_control_point(
-        self, tag: int, cp_index: int, new_pt: list(float), notify: bool = True
-    ):
+    def update_control_point(self, tag: int, cp_index: int, new_pt: list(float), notify: bool = True):
         """Met à jour un point de contrôle d'une courbe et rafraîchit l'affichage."""
         if tag in self.curves:
             curve = self.curves[tag]
@@ -484,8 +469,6 @@ class Model:
                 if notify:
                     self._notify_observers()
             else:
-                print(
-                    f"Erreur : L'index {cp_index} n'existe pas. La courbe a {len(cps)} points de contrôle."
-                )
+                print(f"Erreur : L'index {cp_index} n'existe pas. La courbe a {len(cps)} points de contrôle.")
         else:
             print(f"Erreur : La courbe {tag} n'est pas une courbe personnalisée.")

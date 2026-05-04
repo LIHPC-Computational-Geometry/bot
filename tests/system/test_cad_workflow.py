@@ -4,7 +4,6 @@ System tests — full CAD workflow.
 These tests exercise the Model end-to-end: file loading, topology queries,
 point addition and render-data consistency.  No Panda3D required.
 """
-
 import unittest
 from bot.core.cad import Model as CADModel
 
@@ -60,39 +59,42 @@ class TestRenderDataCoherence(unittest.TestCase):
 
     def test_render_data_has_all_keys(self):
         data = self.cad.get_render_data()
-        self.assertIn("points", data)
-        self.assertIn("edges", data)
-        self.assertIn("bounds", data)
+        self.assertIn('points', data)
+        self.assertIn('edges', data)
+        self.assertIn('bounds', data)
 
     def test_edges_reference_valid_point_indices(self):
         data = self.cad.get_render_data()
-        n = len(data["points"])
-        for idx_a, idx_b, _curve_tag in data["edges"]:
+        n = len(data['points'])
+        for idx_a, idx_b, _curve_tag in data['edges']:
             self.assertGreaterEqual(idx_a, 0)
             self.assertLess(idx_a, n)
             self.assertGreaterEqual(idx_b, 0)
             self.assertLess(idx_b, n)
 
     def test_bounds_center_is_inside_min_max(self):
-        bounds = self.cad.get_render_data()["bounds"]
+        bounds = self.cad.get_render_data()['bounds']
         for axis in range(3):
-            self.assertGreaterEqual(bounds["center"][axis], bounds["min"][axis] - 1e-9)
-            self.assertLessEqual(bounds["center"][axis], bounds["max"][axis] + 1e-9)
+            self.assertGreaterEqual(
+                bounds['center'][axis], bounds['min'][axis] - 1e-9
+            )
+            self.assertLessEqual(
+                bounds['center'][axis], bounds['max'][axis] + 1e-9
+            )
 
     def test_bounds_size_matches_min_max(self):
-        bounds = self.cad.get_render_data()["bounds"]
+        bounds = self.cad.get_render_data()['bounds']
         for axis in range(3):
-            expected = bounds["max"][axis] - bounds["min"][axis]
-            self.assertAlmostEqual(bounds["size"][axis], expected, places=9)
+            expected = bounds['max'][axis] - bounds['min'][axis]
+            self.assertAlmostEqual(bounds['size'][axis], expected, places=9)
 
     def test_render_data_is_picklable(self):
         import pickle
-
         data = self.cad.get_render_data()
         serialised = pickle.dumps(data)
         restored = pickle.loads(serialised)
-        self.assertEqual(data["bounds"], restored["bounds"])
-        self.assertEqual(len(data["points"]), len(restored["points"]))
+        self.assertEqual(data['bounds'], restored['bounds'])
+        self.assertEqual(len(data['points']), len(restored['points']))
 
 
 class TestAddPointWorkflow(unittest.TestCase):
@@ -102,7 +104,7 @@ class TestAddPointWorkflow(unittest.TestCase):
         self.cad = CADModel()
         self.cad.open(GEO_FILE)
         self.initial_point_count = len(self.cad.get_point_tags())
-        self.initial_render_pts = len(self.cad.get_render_data()["points"])
+        self.initial_render_pts  = len(self.cad.get_render_data()['points'])
 
     def tearDown(self):
         self.cad.finalize()
@@ -120,16 +122,16 @@ class TestAddPointWorkflow(unittest.TestCase):
 
     def test_add_point_updates_render_data(self):
         self.cad.add_point([100.0, 100.0, 0.0])
-        new_count = len(self.cad.get_render_data()["points"])
+        new_count = len(self.cad.get_render_data()['points'])
         # Mesh is regenerated: number of discretisation nodes changes
         self.assertGreater(new_count, 0)
 
     def test_bounds_extend_when_point_is_outside(self):
-        old_bounds = self.cad.get_render_data()["bounds"]
-        far_x = old_bounds["max"][0] + 1000.0
+        old_bounds = self.cad.get_render_data()['bounds']
+        far_x = old_bounds['max'][0] + 1000.0
         self.cad.add_point([far_x, 0.0, 0.0])
-        new_bounds = self.cad.get_render_data()["bounds"]
-        self.assertGreaterEqual(new_bounds["max"][0], far_x - 1e-6)
+        new_bounds = self.cad.get_render_data()['bounds']
+        self.assertGreaterEqual(new_bounds['max'][0], far_x - 1e-6)
 
     def test_cumulative_additions(self):
         coords = [[10.0, 0.0, 0.0], [20.0, 0.0, 0.0], [30.0, 0.0, 0.0]]
@@ -165,5 +167,5 @@ class TestClosestPointWorkflow(unittest.TestCase):
         self.assertEqual(len(result), len(coords))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

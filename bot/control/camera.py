@@ -1,7 +1,6 @@
 from panda3d.core import LPoint3, LVector3, OrthographicLens, LineSegs, NodePath
 from direct.interval.IntervalGlobal import Parallel, LerpFunc, Sequence, Func
 
-
 class CameraController:
     """
     Orthographic camera controller for the 3D view.
@@ -12,7 +11,7 @@ class CameraController:
     ``cmd_zoom``, ``cmd_center`` and ``cmd_align_plane``.
     """
 
-    # TODO: check settings maybe a configuration error
+    #TODO: check settings maybe a configuration error
     def __init__(self, base, scene, settings):
         """
         Set up the orthographic camera and its node hierarchy.
@@ -52,9 +51,10 @@ class CameraController:
         self.key_pan_speed = 2.0
 
         # Task pour maintenir le marqueur et le gizmo
-        self.taskMgr.add(self.update_task, "CameraUpdateTask")
+        taskMgr.add(self.update_task, "CameraUpdateTask")
         # Configure la camera par rapport au contenu de la scene
         self.refresh_scene()
+
 
     def refresh_scene(self):
         """
@@ -67,8 +67,7 @@ class CameraController:
         bounds = self.scene.geom_node.getBounds()
         center = bounds.getCenter()
         radius = bounds.getRadius()
-        if radius <= 0:
-            radius = 1  # Sécurité si modèle vide
+        if radius <= 0: radius = 1 # Sécurité si modèle vide
 
         # 2. Positionner le pivot au centre de l'objet
         self.focal_node.setPos(center)
@@ -101,12 +100,10 @@ class CameraController:
         """
         ls = LineSegs()
         ls.setThickness(2)
-        for i, col in enumerate([(1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1)]):
+        for i, col in enumerate([(1,0,0,1), (0,1,0,1), (0,0,1,1)]):
             ls.setColor(col)
-            v = LVector3(0, 0, 0)
-            v[i] = 0.5
-            ls.moveTo(0, 0, 0)
-            ls.drawTo(v)
+            v = LVector3(0,0,0); v[i] = 0.5
+            ls.moveTo(0,0,0); ls.drawTo(v)
         return NodePath(ls.create())
 
     def handle_rotate(self, dx, dy):
@@ -117,8 +114,7 @@ class CameraController:
             dx: Normalised horizontal delta (screen space, -1..1).
             dy: Normalised vertical delta (screen space, -1..1).
         """
-        if self.is_animating:
-            return
+        if self.is_animating: return
         sens = 100.0
         new_h = self.focal_node.getH() - dx * sens
         new_p = self.focal_node.getP() + dy * sens
@@ -135,8 +131,7 @@ class CameraController:
             dx: Normalised horizontal delta (screen space, -1..1).
             dy: Normalised vertical delta (screen space, -1..1).
         """
-        if self.is_animating:
-            return
+        if self.is_animating: return
 
         # Largeur de la vue actuelle
         fs = self.lens.getFilmSize().getX()
@@ -160,8 +155,7 @@ class CameraController:
             factor: Multiplier applied to the current film size
                     (< 1 zooms in, > 1 zooms out).
         """
-        if self.is_animating:
-            return
+        if self.is_animating: return
 
         # 1. Calculer la nouvelle taille de vue
         current_size = self.lens.getFilmSize().getX()
@@ -186,20 +180,21 @@ class CameraController:
         Only the pivot position is animated; rotation and zoom are left
         unchanged so the user keeps their current viewing angle.
         """
-        if self.is_animating:
-            return
+        if self.is_animating: return
         self.is_animating = True
 
         # On récupère le centre réel de l'objet calculé dans analyze_model
         # target_pos est un LPoint3 (le centre géométrique du modèle)
         target_pos = self.model_center
 
-        duration = 0.4  # Un peu plus rapide pour un recadrage fluide
+        duration = 0.4 # Un peu plus rapide pour un recadrage fluide
 
         # On ne crée qu'UN SEUL intervalle : la position.
         # On ne touche NI au HPR (rotation) NI au FilmSize (zoom).
         self.cam_anim = self.focal_node.posInterval(
-            duration, target_pos, blendType="easeInOut"
+            duration,
+            target_pos,
+            blendType='easeInOut'
         )
         # Séquence pour déverrouiller à la fin
         Sequence(self.cam_anim, Func(self._unlock)).start()
@@ -219,15 +214,14 @@ class CameraController:
             axis: One of ``"x"`` (right view), ``"y"`` (front view) or
                   ``"z"`` (top view).
         """
-        if self.is_animating:
-            return
+        if self.is_animating: return
 
         # 1. Définir les rotations cibles (Heading, Pitch, Roll)
-        if axis == "z":  # Vue de dessus (Top)
+        if axis == "z": # Vue de dessus (Top)
             target_hpr = LPoint3(0, -90, 0)
-        elif axis == "y":  # Vue de face (Front)
+        elif axis == "y": # Vue de face (Front)
             target_hpr = LPoint3(0, 0, 0)
-        elif axis == "x":  # Vue de côté (Right)
+        elif axis == "x": # Vue de côté (Right)
             target_hpr = LPoint3(90, 0, 0)
         else:
             return
@@ -235,30 +229,28 @@ class CameraController:
         self.is_animating = True
 
         duration = 0.5
-        # 2. Animation fluide de la rotation du pivot
+            # 2. Animation fluide de la rotation du pivot
         # On peut aussi combiner cela avec un recentrage automatique
-        center = LPoint3(*self.scene.bounds["center"])
-        max_dim = (
-            max(self.scene.bounds["size"])
-            if max(self.scene.bounds["size"]) > 0
-            else 1.0
-        )
+        center = LPoint3(*self.scene.bounds['center'])
+        max_dim = max(self.scene.bounds['size']) if max(self.scene.bounds['size']) > 0 else 1.0
         self.transition = Parallel(
             # 1. Aligne la rotation sur l'axe demandé
-            self.focal_node.hprInterval(duration, target_hpr, blendType="easeInOut"),
+            self.focal_node.hprInterval(duration, target_hpr, blendType='easeInOut'),
+
             # 2. Déplace le pivot vers le centre réel du modèle
-            self.focal_node.posInterval(duration, center, blendType="easeInOut"),
-            LerpFunc(
-                lambda s: self.lens.setFilmSize(s),
-                fromData=self.lens.getFilmSize().getX(),
-                toData=max_dim * 1.5,
-                duration=duration,
-                blendType="easeInOut",
-            ),
+            self.focal_node.posInterval(duration, center, blendType='easeInOut'),
+            LerpFunc(lambda s: self.lens.setFilmSize(s),
+                      fromData=self.lens.getFilmSize().getX(),
+                      toData=max_dim * 1.5,
+                      duration=duration,
+                      blendType='easeInOut'),
         )
 
         # On lance et on déverrouille à la fin
-        Sequence(self.transition, Func(self._unlock)).start()
+        Sequence(
+            self.transition,
+            Func(self._unlock)
+        ).start()
 
         # Parallel(
         #     self.focal_node.hprInterval(duration, target_hpr, blendType='easeInOut'),
@@ -273,6 +265,7 @@ class CameraController:
 
         # taskMgr.doMethodLater(duration, self._unlock, "UnlockTask")
 
+
     def update_task(self, task):
         """
         Per-frame task: keep the pivot marker and gizmo in sync with the camera.
@@ -283,6 +276,7 @@ class CameraController:
         # Le marqueur suit le pivot
         self.marker.setPos(self.focal_node.getPos())
         # Mise à jour du Gizmo (orientation de la caméra vers le monde)
-        if hasattr(self.scene, "gizmo"):
+        if hasattr(self.scene, 'gizmo'):
             self.scene.gizmo.update(self.base.camera.getQuat(self.base.render))
         return task.cont
+

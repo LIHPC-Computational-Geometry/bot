@@ -1,8 +1,8 @@
 import unittest
 from bot.core.cad import Model as CADModel
 
-
 class GeomTest(unittest.TestCase):
+
     def test_topology_query_2D(self):
         cad = CADModel()
         cad.open("data/profil_1.geo")
@@ -48,15 +48,14 @@ class GeomTest(unittest.TestCase):
         coords = [2, 0, 0, 4, 2, 0]
         # We get the closest points on the 2nd curve which is a straight line
         # that connects (0,1,0) to (5,1,0)
-        outputs = cad.getClosestPoint(1, 2, coords)
+        outputs = cad.getClosestPoint(1,2,coords)
         # We know what should be the closest points
         oracle = [2, 1, 0, 4, 1, 0]
 
-        # and we compare
+        #and we compare
         epsilon = 1e-9
-        for v1, v2 in zip(oracle, outputs):
+        for v1, v2 in zip(oracle,outputs):
             self.assertAlmostEqual(v1, v2, delta=epsilon)
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

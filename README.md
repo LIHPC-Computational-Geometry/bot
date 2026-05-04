@@ -122,7 +122,7 @@ We use [uv](https://docs.astral.sh/uv/) for all dependency and environment manag
 ### 1. Clone and set up
 
 ```bash
-git clone --recurse-submodules https://github.com/franck-ledoux/bot.git
+git clone https://github.com/franck-ledoux/bot.git
 cd bot
 uv sync          # creates .venv and installs all production + dev dependencies
 ```
@@ -193,7 +193,6 @@ bot/
 │   └── viewer/
 │       ├── viewer.py        # Viewer — public API, manages the subprocess
 │       └── app.py           # ViewerApp — Panda3D ShowBase (runs in subprocess)
-|── ferrispline/             # Submodule library for generating, manipulating and computing hexahedral meshes
 ├── tests/
 │   ├── unit/                # Isolated class tests (no display required)
 │   └── system/              # End-to-end workflow tests
