@@ -16,7 +16,12 @@ Quick start:
 """
 
 from . import core, view
-from .core.cad import Model as CADModel
 from .viewer import Viewer
+
+try:
+    from .core.cad import Model as CADModel
+except ModuleNotFoundError:
+    CADModel = None
+Model = CADModel
 
 __all__ = ['core', 'control', 'view', 'viewer', 'Model', 'Viewer']

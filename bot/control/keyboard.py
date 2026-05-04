@@ -30,9 +30,21 @@ class KeyboardHandler:
         self.base.accept('escape', sys.exit)
         self.base.accept('f5', lambda: base.messenger.send("cmd_hot_reload"))
         self.base.accept('c', lambda: base.messenger.send("cmd_center"))
-        self.base.accept('x', lambda: base.messenger.send("cmd_align_plane", ["x"]))
-        self.base.accept('y', lambda: base.messenger.send("cmd_align_plane", ["y"]))
-        self.base.accept('z', lambda: base.messenger.send("cmd_align_plane", ["z"]))
+        self.base.accept('alt-x', lambda: base.messenger.send("cmd_align_plane", ["x"]))
+        self.base.accept('alt-y', lambda: base.messenger.send("cmd_align_plane", ["y"]))
+        self.base.accept('alt-z', lambda: base.messenger.send("cmd_align_plane", ["z"]))
+
+        self.base.accept('x', lambda: base.messenger.send("cmd_axis_constraint", [1]))
+        self.base.accept('y', lambda: base.messenger.send("cmd_axis_constraint", [2]))
+        self.base.accept('z', lambda: base.messenger.send("cmd_axis_constraint", [4]))
+        self.base.accept('shift-x', lambda: base.messenger.send("cmd_axis_constraint", [6]))
+        self.base.accept('shift-y', lambda: base.messenger.send("cmd_axis_constraint", [5]))
+        self.base.accept('shift-z', lambda: base.messenger.send("cmd_axis_constraint", [3]))
+
+        # Axis-constraint shortcuts (0..7 mask).
+        # x=1, y=2, z=4
+        for mask in range(8):
+            self.base.accept(str(mask), lambda m=mask: base.messenger.send("cmd_axis_constraint", [m]))
         # Flèches directionnelles
         #self.base.accept('arrow_left',  lambda: base.messenger.send("cmd_pan", [-1, 0]))
         #self.base.accept('arrow_right', lambda: base.messenger.send("cmd_pan", [1, 0]))

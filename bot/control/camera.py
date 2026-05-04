@@ -88,8 +88,8 @@ class CameraController:
         # 6. Ajuster la profondeur de rendu (Near/Far)
         # Très important pour ne pas que l'objet soit "tronçonné"
         limit = max(100000, self.model_radius * 1000)
-        self.lens.setNear(-limit)
-        self.lens.setFar(limit)
+        self.lens.setNear(0.1)
+        self.lens.setFar(limit * 2)
 
     def create_marker(self):
         """
