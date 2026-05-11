@@ -52,7 +52,7 @@ class CameraController:
         self.key_pan_speed = 2.0
 
         # Task pour maintenir le marqueur et le gizmo
-        self.taskMgr.add(self.update_task, "CameraUpdateTask")
+        self.base.taskMgr.add(self.update_task, "CameraUpdateTask")
         # Configure la camera par rapport au contenu de la scene
         self.refresh_scene()
 

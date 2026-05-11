@@ -10,6 +10,8 @@ from panda3d.core import (
 from panda3d.core import LineSegs, NodePath
 
 import nurbslib
+import numpy as np
+
 
 # NOTE: Un mask permet de filtrer les objet que l'on veux collisionner
 MASK_CURVE_PICK = BitMask32.bit(1)
@@ -200,8 +202,14 @@ class CurveApp:
         self.control_points[cp_index] = [new_pos[0], new_pos[1], new_pos[2]]
 
         if self.type == "bezier" and self.degree is not None:
-            engine = nurbslib.PyBezierCurve(int(self.degree), self.control_points, None)
-            self.points = engine.evaluate(100, False)
+            cp_array = np.array(self.control_points, dtype=np.float64)
+            engine = nurbslib.PyBezierCurve(int(self.degree), cp_array, None)
+
+            pts = engine.evaluate(100, False)
+            if len(pts.shape) == 2 and pts.shape[0] in (2, 3) and pts.shape[1] > 3:
+                pts = pts.T
+
+            self.points = pts.tolist()
             self.edges = [(i, i + 1) for i in range(len(self.points) - 1)]
 
         if self.curve_render_node is not None:

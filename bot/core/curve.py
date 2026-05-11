@@ -1,5 +1,5 @@
 import nurbslib
-
+import numpy as np
 
 class BezierCurve:
     """
@@ -8,7 +8,8 @@ class BezierCurve:
 
     def __init__(self, tag: str, control_points: list[list[float]], degree: int):
         self.tag = tag
-        self._engine = nurbslib.PyBezierCurve(degree, control_points, None)
+        cp_array = np.array(control_points, dtype=np.float64)
+        self._engine = nurbslib.PyBezierCurve(degree, cp_array, None)
 
     @staticmethod
     def _default_control_points(coords_a, coords_b, degree=3):
@@ -38,19 +39,26 @@ class BezierCurve:
         return self.tag
 
     def get_control_points(self):
-        return self._engine.get_control_points()
+        cp = self._engine.get_control_points()
+        if len(cp.shape) == 2 and cp.shape[0] in (2, 3) and cp.shape[1] > 3:
+            cp = cp.T
+        return cp.tolist()
 
     def get_degree(self):
         return self._engine.get_degree()
 
     def set_control_points(self, control_points: list[list[float]]):
         """Replace the internal curve engine with updated control points."""
-        self._engine = nurbslib.PyBezierCurve(self.get_degree(), control_points, None)
+        cp_array = np.array(control_points, dtype=np.float64)
+        self._engine = nurbslib.PyBezierCurve(self.get_degree(), cp_array, None)
 
     def get_render_data(self) -> dict:
+        curve_pts = self._engine.evaluate(100, False)
+        if len(curve_pts.shape) == 2 and curve_pts.shape[0] in (2, 3) and curve_pts.shape[1] > 3:
+            curve_pts = curve_pts.T
         return {
             "tag": self.tag,
             "control_points": self.get_control_points(),
             "degree": self.get_degree(),
-            "curve": self._engine.evaluate(100, False),
+            "curve": curve_pts.tolist(),
         }
