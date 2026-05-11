@@ -48,6 +48,7 @@ class MouseHandler:
         self.drag_plane = None
         self.drag_start_world_pos = None
         self.drag_last_valid_world_pos = None
+        self.drag_offset = [0.0, 0.0, 0.0]
         self.drag_active_mask = 7
         self.axis_constraint_mask = 7
         self._last_drag_emit = 0.0
@@ -91,6 +92,7 @@ class MouseHandler:
         self.drag_plane = None
         self.drag_start_world_pos = None
         self.drag_last_valid_world_pos = None
+        self.drag_offset = [0.0, 0.0, 0.0]
         self.drag_active_mask = self.axis_constraint_mask
 
     def _finalize_drag(self, world_pos):
@@ -289,6 +291,17 @@ class MouseHandler:
             ]
             self.drag_last_valid_world_pos = list(self.drag_start_world_pos)
             self.drag_active_mask = int(self.axis_constraint_mask)
+            
+            initial_hit = self._mouse_to_constrained_axis(m_pos)
+            if initial_hit is not None:
+                self.drag_offset = [
+                    self.drag_start_world_pos[0] - initial_hit[0],
+                    self.drag_start_world_pos[1] - initial_hit[1],
+                    self.drag_start_world_pos[2] - initial_hit[2],
+                ]
+            else:
+                self.drag_offset = [0.0, 0.0, 0.0]
+
             self.base._scene.set_cp_color(
                 self.drag_curve_tag, self.drag_cp_index, [1, 0.5, 0, 1]
             )
@@ -312,6 +325,11 @@ class MouseHandler:
             world_pos = self._mouse_to_constrained_axis(m_pos)
             if world_pos is None:
                 return
+            world_pos = [
+                world_pos[0] + self.drag_offset[0],
+                world_pos[1] + self.drag_offset[1],
+                world_pos[2] + self.drag_offset[2],
+            ]
             self.drag_last_valid_world_pos = list(world_pos)
             if getattr(self.base, "_scene", None) is not None:
                 self.base._scene.preview_control_point(
@@ -334,6 +352,12 @@ class MouseHandler:
             world_pos = self._mouse_to_constrained_axis(m_pos)
             if world_pos is None:
                 world_pos = self.drag_last_valid_world_pos
+            else:
+                world_pos = [
+                    world_pos[0] + self.drag_offset[0],
+                    world_pos[1] + self.drag_offset[1],
+                    world_pos[2] + self.drag_offset[2],
+                ]
             self._finalize_drag(world_pos)
 
     def _handle_curve_click(self, m_pos, left_down):
