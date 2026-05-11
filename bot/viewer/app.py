@@ -138,8 +138,8 @@ class ViewerApp(ShowBase):
         try:
             raw_mask = int(mask)
         except TypeError, ValueError:
-            raw_mask = 7
-            self.hud.setText("Axis constraint invalid, fallback to xyz (7).")
+            raw_mask = 3
+            self.hud.setText("Axis constraint invalid, fallback to xy (3).")
         self.axis_constraint_mask = max(0, min(7, raw_mask))
         if self.axis_constraint_mask != raw_mask:
             self.hud.setText(f"Axis constraint clamped to {self.axis_constraint_mask}.")
@@ -174,3 +174,4 @@ class ViewerApp(ShowBase):
             self.load_scene(geom_data)
         else:
             self._scene.rebuild(geom_data)
+

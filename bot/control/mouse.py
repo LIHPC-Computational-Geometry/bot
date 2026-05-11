@@ -121,15 +121,21 @@ class MouseHandler:
 
     def _entry_metadata(self, entry):
         np = entry.getIntoNodePath()
+        pick_kind = np.getNetTag("pick_kind") if np.hasNetTag("pick_kind") else None
+        
+        point = entry.getSurfacePoint(self.base.render)
+        if pick_kind == "cp":
+            solid = entry.getInto()
+            if hasattr(solid, "getCenter"):
+                point = self.base.render.getRelativePoint(np, solid.getCenter())
+
         return {
             "curve_tag": np.getNetTag("curve_tag")
             if np.hasNetTag("curve_tag")
             else None,
             "cp_index": np.getNetTag("cp_index") if np.hasNetTag("cp_index") else None,
-            "pick_kind": np.getNetTag("pick_kind")
-            if np.hasNetTag("pick_kind")
-            else None,
-            "point": entry.getSurfacePoint(self.base.render),
+            "pick_kind": pick_kind,
+            "point": point,
         }
 
     def _handle_hover(self, m_pos):
@@ -355,14 +361,9 @@ class MouseHandler:
 
                 # On n'envoie le message QUE si la souris a réellement bougé
                 if delta.lengthSquared() > 0:
-                    if self.base.mouseWatcherNode.isButtonDown("shift"):
-                        self.base.messenger.send(
-                            "cmd_pan", [delta.getX(), delta.getY()]
-                        )
-                    else:
-                        self.base.messenger.send(
-                            "cmd_rotate", [delta.getX(), delta.getY()]
-                        )
+                    self.base.messenger.send(
+                        "cmd_pan", [delta.getX(), delta.getY()]
+                    )
 
             # CRITIQUE : On met à jour prev_mouse_pos À CHAQUE FRAME
             # pour que le delta reste minuscule entre deux frames.

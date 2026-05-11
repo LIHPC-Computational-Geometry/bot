@@ -101,7 +101,7 @@ class CameraController:
         """
         ls = LineSegs()
         ls.setThickness(2)
-        for i, col in enumerate([(1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1)]):
+        for i, col in enumerate([(1, 0, 0, 1), (0, 1, 0, 1)]):
             ls.setColor(col)
             v = LVector3(0, 0, 0)
             v[i] = 0.5

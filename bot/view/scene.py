@@ -44,7 +44,8 @@ class HUDGizmo:
         """Draw the three RGB axis segments."""
         ls = LineSegs()
         ls.setThickness(2)
-        for i, col in enumerate([(1, 0, 0), (0, 1, 0), (0, 0, 1)]):
+        # for i, col in enumerate([(1, 0, 0), (0, 1, 0), (0, 0, 1)]):
+        for i, col in enumerate([(1, 0, 0), (0, 1, 0)]):
             ls.setColor(LColor(*col, 1))
             ls.moveTo(0, 0, 0)
             target = [0, 0, 0]
@@ -91,7 +92,7 @@ class Scene:
         self.curves = {}
         self.active_curve_tag = None
         self.edit_mode_enabled = False
-        self.axis_constraint_mask = 7
+        self.axis_constraint_mask = 3
         self._constraint_guide_np = None
         self._world_axes_np = None
         self._transform_gizmo_np = None
