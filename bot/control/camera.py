@@ -35,8 +35,9 @@ class CameraController:
 
         # 2. Hiérarchie : focal_node (Pivot) -> camera
         self.focal_node = self.base.render.attachNewNode("camera_pivot")
+        self.focal_node.setHpr(0, -90, 0)
         self.base.camera.reparentTo(self.focal_node)
-        self.base.camera.setPos(0, -100, 0)
+        self.base.camera.setPos(0, 0, 0)
         # 3. Marqueur de pivot (la croix)
         self.marker = self.create_marker()
         self.marker.reparentTo(self.base.render)
