@@ -207,7 +207,7 @@ class Scene:
         else:
             try:
                 curve = self.curves.get(int(tag))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 curve = None
 
         if curve is not None:
@@ -220,7 +220,7 @@ class Scene:
         else:
             try:
                 curve = self.curves.get(int(tag))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 curve = None
 
         if curve is not None:
@@ -236,7 +236,7 @@ class Scene:
     def set_active_curve(self, tag):
         try:
             normalized = int(tag) if tag is not None else None
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             normalized = None
         self.active_curve_tag = normalized
         for curve_tag, curve in self.curves.items():

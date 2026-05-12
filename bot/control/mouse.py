@@ -361,10 +361,14 @@ class MouseHandler:
             self._finalize_drag(world_pos)
 
     def _handle_curve_click(self, m_pos, left_down):
-        if self.edit_mode_enabled:
-            return
         if not left_down or self._left_was_down:
             return
+
+        if self.edit_mode_enabled:
+            cp_entry = self._pick_entry(m_pos, BitMask32.bit(2))
+            if cp_entry is not None:
+                return
+
         entry = self._pick_entry(m_pos, BitMask32.bit(1))
         if entry is None:
             return

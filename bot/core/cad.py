@@ -463,7 +463,7 @@ class Model:
         return node_coords_3d, surfaces
 
     def update_control_point(
-        self, tag: int, cp_index: int, new_pt: list(float), notify: bool = True
+        self, tag: int, cp_index: int, new_pt: list[float], notify: bool = True
     ):
         """Met à jour un point de contrôle d'une courbe et rafraîchit l'affichage."""
         if tag in self.curves:

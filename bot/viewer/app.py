@@ -137,7 +137,7 @@ class ViewerApp(ShowBase):
     def _set_axis_constraint(self, mask: int):
         try:
             raw_mask = int(mask)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             raw_mask = 3
             self.hud.setText("Axis constraint invalid, fallback to xy (3).")
         self.axis_constraint_mask = max(0, min(7, raw_mask))
