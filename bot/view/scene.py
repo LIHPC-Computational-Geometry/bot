@@ -98,6 +98,7 @@ class Scene:
         self._transform_gizmo_np = None
         self._constraint_guide_origin = None
         self._constraint_guide_visible = False
+        self.last_units_per_pixel = 0.01
 
         self.geom_node = self._build_from_data(geom_data)
         self._constraint_guide_np = self.base.render.attachNewNode(
@@ -111,6 +112,8 @@ class Scene:
         self._transform_gizmo_np.hide()
         self.gizmo = HUDGizmo(self.base.pixel2d)
         self.add_lighting()
+
+        self.base.accept("zoom_changed", self._on_zoom_changed)
 
     @property
     def bounds(self) -> dict:
@@ -191,6 +194,7 @@ class Scene:
         geom_root = self.base.render.attachNewNode("geom_root")
 
         for tag, curve in self.curves.items():
+            curve.update_collision_sizes(self.last_units_per_pixel)
             curve.create_curve_geometry(self.line_thickness)
             node_path = geom_root.attachNewNode(f"curve_{tag}")
             curve.attachCuveNode(node_path)
@@ -385,3 +389,10 @@ class Scene:
 
         self.base.render.setLight(self.base.render.attachNewNode(ambient))
         self.base.render.setLight(self.base.render.attachNewNode(directional))
+
+    def _on_zoom_changed(self, film_size):
+        """Met à jour le rayon de sélection pour qu'il reste constant à l'écran"""
+        win_width = self.base.win.getXSize() or 1000
+        self.last_units_per_pixel = film_size / win_width # On stocke !
+        for curve in self.curves.values():
+            curve.update_collision_sizes(self.last_units_per_pixel)

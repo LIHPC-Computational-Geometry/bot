@@ -105,41 +105,64 @@ class CurveApp:
         self.cp_node.hide()
         return self.cp_node
 
+    def _attachColissionNode(self):
+        # NETTOYAGE ABSOLU : On détruit l'ancien noeud et tous ses enfants
+        if getattr(self, "curve_collision_node", None) is not None:
+            self.curve_collision_node.removeNode()
+
+        self.curve_collision_node = self.node_path.attachNewNode("curve_collision")
+
+        cnode = CollisionNode(f"col_{self.tag}")
+        cnode.setFromCollideMask(BitMask32.allOff())
+        cnode.setIntoCollideMask(MASK_CURVE_PICK)
+
+        radius = getattr(self, 'curve_pick_radius', 0.2)
+        self._create_collision(cnode, radius)
+
+        cnp = self.curve_collision_node.attachNewNode(cnode)
+        cnp.setTag("curve_tag", str(self.tag))
+        cnp.setTag("pick_kind", "curve")
+        cnp.show()
+        return cnp
+
     def _rebuild_cp_collision(self):
-        if self.cp_collision_node is None or self.control_points is None:
+        if self.control_points is None or getattr(self, "node_path", None) is None:
             return
 
-        self.cp_collision_node.getChildren().detach()
+        # NETTOYAGE ABSOLU pour les points de contrôle
+        if getattr(self, "cp_collision_node", None) is not None:
+            self.cp_collision_node.removeNode()
+
+        self.cp_collision_node = self.node_path.attachNewNode("cp_collision")
+
+        radius = getattr(self, 'cp_pick_radius', 0.4)
+        current_mask = MASK_CP_PICK if self.cp_visible else BitMask32.allOff()
+
         for i, pt in enumerate(self.control_points):
             cnode = CollisionNode(f"cp_{self.tag}_{i}")
-            cnode.setIntoCollideMask(MASK_CP_PICK)
+            cnode.setIntoCollideMask(current_mask)
             cnode.setFromCollideMask(BitMask32.allOff())
-            cnode.addSolid(CollisionSphere(pt[0], pt[1], pt[2], 1.2))
+            cnode.addSolid(CollisionSphere(pt[0], pt[1], pt[2], radius))
             cnp = self.cp_collision_node.attachNewNode(cnode)
             cnp.setTag("curve_tag", str(self.tag))
             cnp.setTag("cp_index", str(i))
             cnp.setTag("pick_kind", "cp")
+            cnp.show()
 
-    def _create_collision(self, cnode: NodePath):
+    def _create_collision(self, cnode: CollisionNode, radius=0.4):
         for idxA, idxB in self.edges:
             ptA = self.points[idxA]
             ptB = self.points[idxB]
-            radius = 0.4
+
+            # SÉCURITÉ PANDA3D MAXIMALE :
+            # Empêche la division par zéro et l'apparition des Hitboxes Infinies.
+            dist_sq = (ptA[0]-ptB[0])**2 + (ptA[1]-ptB[1])**2 + (ptA[2]-ptB[2])**2
+            if dist_sq < 1e-5:
+                # Si le segment est microscopique, on ne lui donne pas de hitbox.
+                continue
+
             tube = CollisionTube(ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius)
             cnode.addSolid(tube)
-
-    def _attachColissionNode(self):
-        cnode = CollisionNode(f"col_{self.tag}")
-        cnode.setFromCollideMask(BitMask32.allOff())
-        cnode.setIntoCollideMask(MASK_CURVE_PICK)
-        self._create_collision(cnode)
-        if self.curve_collision_node is not None:
-            self.curve_collision_node.removeNode()
-        self.curve_collision_node = self.node_path.attachNewNode("curve_collision")
-        cnp = self.curve_collision_node.attachNewNode(cnode)
-        cnp.setTag("curve_tag", str(self.tag))
-        cnp.setTag("pick_kind", "curve")
-        return cnp
 
     def _draw_curve(self):
         lines = LineSegs()
@@ -150,6 +173,10 @@ class CurveApp:
         self._curve_geom_node = self.curve_render_node.attachNewNode(lines.create())
 
     def attachCuveNode(self, node_path: NodePath):
+        if self.curve_render_node: self.curve_render_node.removeNode()
+        if self.curve_collision_node: self.curve_collision_node.removeNode()
+        if self.cp_render_node: self.cp_render_node.removeNode()
+        if self.cp_collision_node: self.cp_collision_node.removeNode()
         self.node_path = node_path
         self.node_path.setTag("curve_tag", str(self.tag))
         self.curve_render_node = self.node_path.attachNewNode("curve_render")
@@ -188,10 +215,18 @@ class CurveApp:
         self.cp_visible = visible
         if self.cp_node is None:
             return
+
         if visible:
             self.cp_node.show()
         else:
             self.cp_node.hide()
+
+        # SÉCURITÉ : On désactive physiquement les clics sur les points masqués
+        if self.cp_collision_node is not None:
+            current_mask = MASK_CP_PICK if visible else BitMask32.allOff()
+            for cnp in self.cp_collision_node.getChildren():
+                cnp.node().setIntoCollideMask(current_mask)
+                cnp.setCollideMask(current_mask) # Force la MAJ Panda3D
 
     def preview_control_point(self, cp_index: int, new_pos: list[float]):
         if self.control_points is None:
@@ -216,5 +251,14 @@ class CurveApp:
             self._draw_curve()
         if self.cp_render_node is not None:
             self._draw_control_points(self.cp_render_node)
-        self._attachColissionNode()
-        self._rebuild_cp_collision()
+
+
+    def update_collision_sizes(self, units_per_pixel: float):
+        self.curve_pick_radius = units_per_pixel * 6.0
+        self.cp_pick_radius = units_per_pixel * 12.0
+
+        # Le détachement/rattachement est la seule façon de garantir que
+        # le CollisionTraverser mette à jour son arbre de recherche global.
+        if self.node_path is not None:
+            self._attachColissionNode()
+            self._rebuild_cp_collision()

@@ -102,6 +102,11 @@ class MouseHandler:
                     self.drag_curve_tag, self.drag_cp_index, [0.5, 0.5, 0.5, 1]
                 )
                 self.base._scene.hide_axis_guide()
+                # On valide la nouvelle géométrie physique maintenant que la souris est relâchée
+                curve = self.base._scene.curves.get(int(self.drag_curve_tag))
+                if curve is not None:
+                    curve._attachColissionNode()
+                    curve._rebuild_cp_collision()
             self.base._on_event_cb(
                 "cp_pick_end",
                 {
@@ -112,19 +117,43 @@ class MouseHandler:
             )
         self._reset_drag_state()
 
-    def _pick_entry(self, m_pos, mask: BitMask32):
-        self.pickerNode.setFromCollideMask(mask)
+    def _pick_entry(self, m_pos, expected_kind: str):
+        self.pickerNode.setFromCollideMask(BitMask32.bit(1) | BitMask32.bit(2))
         self.pickerRay.setFromLens(self.base.camNode, m_pos.getX(), m_pos.getY())
         self.picker.traverse(self.base.render)
+
         if self.pq.getNumEntries() == 0:
             return None
-        self.pq.sortEntries()
-        return self.pq.getEntry(0)
+
+        entries = []
+        for i in range(self.pq.getNumEntries()):
+            entries.append(self.pq.getEntry(i))
+
+        def get_true_depth(entry):
+            np = entry.getIntoNodePath()
+            pick_kind = np.getNetTag("pick_kind") if np.hasNetTag("pick_kind") else ""
+
+            # Profondeur brute depuis la caméra
+            depth = entry.getSurfacePoint(self.base.cam).getY()
+
+            # Priorité absolue : on "rapproche" virtuellement le CP de la caméra
+            if pick_kind == "cp":
+                return depth - 1000.0
+            return depth
+
+        entries.sort(key=get_true_depth)
+
+        for entry in entries:
+            np = entry.getIntoNodePath()
+            if np.hasNetTag("pick_kind") and np.getNetTag("pick_kind") == expected_kind:
+                return entry
+
+        return None
 
     def _entry_metadata(self, entry):
         np = entry.getIntoNodePath()
         pick_kind = np.getNetTag("pick_kind") if np.hasNetTag("pick_kind") else None
-        
+
         point = entry.getSurfacePoint(self.base.render)
         if pick_kind == "cp":
             solid = entry.getInto()
@@ -143,15 +172,14 @@ class MouseHandler:
     def _handle_hover(self, m_pos):
         """Processes ray picking to detect hovered curves."""
         hovered_tag = None
-        hover_entry = self._pick_entry(m_pos, BitMask32.bit(1))
+        # CORRECTION : on demande une "curve" en format string
+        hover_entry = self._pick_entry(m_pos, "curve")
         if hover_entry is not None:
             metadata = self._entry_metadata(hover_entry)
             hovered_tag = metadata["curve_tag"]
 
-        # Si on survole une nouvelle courbe (ou si on ne survole plus rien)
         if hovered_tag != self.last_hovered_tag:
             self.last_hovered_tag = hovered_tag
-            # On envoie l'info au parent via le callback
             self.base._on_event_cb("hover", hovered_tag)
 
     def _build_drag_plane(self, start_point: Point3):
@@ -162,17 +190,13 @@ class MouseHandler:
     def _mouse_to_plane(self, m_pos):
         if self.drag_plane is None:
             return None
-        p_from = Point3()
-        p_to = Point3()
-        # NOTE: créé deux point dans l'espace local de la camera (from position de la camera et to un point très dans la direction que vise la camera)
-        if not self.base.camLens.extrude(m_pos, p_from, p_to):
+
+        ray_origin, ray_dir = self._mouse_to_ray(m_pos)
+        if ray_origin is None or ray_dir is None:
             return None
-        # NOTE: converti les points locaux en point global du monde 3D
-        p_from = self.base.render.getRelativePoint(self.base.cam, p_from)
-        p_to = self.base.render.getRelativePoint(self.base.cam, p_to)
+
         hit = Point3()
-        # NOTE: calcule l'intersection du plan 'drag_plane' et du rayon from_p -> to_p
-        if self.drag_plane.intersectsLine(hit, p_from, p_to):
+        if self.drag_plane.intersectsLine(hit, ray_origin, ray_origin + ray_dir * 1000000.0):
             return [hit[0], hit[1], hit[2]]
         return None
 
@@ -181,13 +205,21 @@ class MouseHandler:
         p_to = Point3()
         if not self.base.camLens.extrude(m_pos, p_from, p_to):
             return None, None
-        p_from = self.base.render.getRelativePoint(self.base.cam, p_from)
-        p_to = self.base.render.getRelativePoint(self.base.cam, p_to)
-        direction = Vec3(p_to - p_from)
-        if direction.lengthSquared() <= 1e-12:
-            return None, None
-        direction.normalize()
-        return p_from, direction
+
+        dir_cam = Vec3(p_to - p_from)
+        dir_cam.normalize()
+
+        # Sécurise l'origine sur le plan focal pour une précision Float32 parfaite
+        if abs(dir_cam.getY()) > 1e-6:
+            t = (0 - p_from.getY()) / dir_cam.getY()
+            origin_cam = p_from + dir_cam * t
+        else:
+            origin_cam = p_from
+
+        p_from_world = self.base.render.getRelativePoint(self.base.cam, origin_cam)
+        direction = self.base.render.getRelativeVector(self.base.cam, dir_cam)
+
+        return p_from_world, direction
 
     def _closest_point_on_axis_to_ray(self, ray_origin, ray_dir, axis_origin, axis_dir):
         w0 = ray_origin - axis_origin
@@ -263,10 +295,10 @@ class MouseHandler:
 
         # NOTE: Check si une interaction pick un cp vient de commencer
         if left_down and not self._left_was_down and not self.dragging_cp:
-            entry = self._pick_entry(m_pos, BitMask32.bit(2))
-            # NOTE: Si le click gauche n'a touché aucune entry du mask 2 la fonction s'arrête
+            entry = self._pick_entry(m_pos, "cp")
             if entry is None:
                 return
+
             metadata = self._entry_metadata(entry)
             if (
                 metadata["pick_kind"] != "cp"
@@ -291,7 +323,7 @@ class MouseHandler:
             ]
             self.drag_last_valid_world_pos = list(self.drag_start_world_pos)
             self.drag_active_mask = int(self.axis_constraint_mask)
-            
+
             initial_hit = self._mouse_to_constrained_axis(m_pos)
             if initial_hit is not None:
                 self.drag_offset = [
@@ -361,15 +393,17 @@ class MouseHandler:
             self._finalize_drag(world_pos)
 
     def _handle_curve_click(self, m_pos, left_down):
+        if getattr(self, "dragging_cp", False):
+            return
         if not left_down or self._left_was_down:
             return
 
-        if self.edit_mode_enabled:
-            cp_entry = self._pick_entry(m_pos, BitMask32.bit(2))
+        if getattr(self, "edit_mode_enabled", False):
+            cp_entry = self._pick_entry(m_pos, "cp")
             if cp_entry is not None:
                 return
 
-        entry = self._pick_entry(m_pos, BitMask32.bit(1))
+        entry = self._pick_entry(m_pos, "curve")
         if entry is None:
             return
         metadata = self._entry_metadata(entry)

@@ -89,9 +89,9 @@ class CameraController:
 
         # 6. Ajuster la profondeur de rendu (Near/Far)
         # Très important pour ne pas que l'objet soit "tronçonné"
-        limit = max(100000, self.model_radius * 1000)
-        self.lens.setNear(0.1)
-        self.lens.setFar(limit * 2)
+        limit = max(10000.0, self.model_radius * 100.0)
+        self.lens.setNear(-limit)
+        self.lens.setFar(limit)
 
     def create_marker(self):
         """
@@ -148,8 +148,10 @@ class CameraController:
         move_x = -dx * (fs * 0.5)
         move_z = -dy * (fs * 0.5)
 
-        # On déplace par rapport à la caméra pour respecter l'orientation de l'écran
-        self.focal_node.setPos(self.base.camera, LVector3(move_x, 0, move_z))
+        # NOTE: Calcul dans l'espace local puis conversion dans le monde
+        cam_vec = LVector3(move_x, 0, move_z)
+        world_vec = self.base.render.getRelativeVector(self.base.camera, cam_vec)
+        self.focal_node.setPos(self.focal_node.getPos() + world_vec)
 
     def handle_zoom(self, factor):
         """
@@ -176,7 +178,7 @@ class CameraController:
             # On s'assure que la profondeur de vue est 10x plus grande que l'objet
             # pour éviter tout "clipping" (disparition)
 
-            limit = max(new_size * 1000, self.model_radius * 1000)
+            limit = max(10000.0, self.model_radius * 100.0)
             self.lens.setNear(-limit)
             self.lens.setFar(limit)
 
@@ -286,4 +288,10 @@ class CameraController:
         # Mise à jour du Gizmo (orientation de la caméra vers le monde)
         if hasattr(self.scene, "gizmo"):
             self.scene.gizmo.update(self.base.camera.getQuat(self.base.render))
+
+        # Émission de l'événement de zoom
+        current_size = self.lens.getFilmSize().getX()
+        if getattr(self, '_last_film_size', None) != current_size:
+            self._last_film_size = current_size
+            self.base.messenger.send("zoom_changed", [current_size])
         return task.cont
