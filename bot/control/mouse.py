@@ -102,7 +102,7 @@ class MouseHandler:
                     self.drag_curve_tag, self.drag_cp_index, [0.5, 0.5, 0.5, 1]
                 )
                 self.base._scene.hide_axis_guide()
-                # On valide la nouvelle géométrie physique maintenant que la souris est relâchée
+                # NOTE: On valide la nouvelle géométrie physique maintenant que la souris est relâchée
                 curve = self.base._scene.curves.get(int(self.drag_curve_tag))
                 if curve is not None:
                     curve._attachColissionNode()
@@ -129,19 +129,32 @@ class MouseHandler:
         for i in range(self.pq.getNumEntries()):
             entries.append(self.pq.getEntry(i))
 
-        def get_true_depth(entry):
+        def get_priority_distance_depth(entry):
             np = entry.getIntoNodePath()
             pick_kind = np.getNetTag("pick_kind") if np.hasNetTag("pick_kind") else ""
-
-            # Profondeur brute depuis la caméra
             depth = entry.getSurfacePoint(self.base.cam).getY()
 
-            # Priorité absolue : on "rapproche" virtuellement le CP de la caméra
             if pick_kind == "cp":
-                return depth - 1000.0
-            return depth
+                solid = entry.getInto()
+                if hasattr(solid, "getCenter"):
+                    # NOTE: On convertit le centre 3D réel du point de contrôle...
+                    cp_world = self.base.render.getRelativePoint(np, solid.getCenter())
+                    p2d = Point2()
 
-        entries.sort(key=get_true_depth)
+                    # NOTE: Et on le projette sur l'écran 2D (coordonnées de -1 à 1)
+                    if self.base.camLens.project(cp_world, p2d):
+                        # NOTE: On compare purement l'écart visuel entre la souris et le centre du point !
+                        dist_sq = (p2d.getX() - m_pos.getX())**2 + (p2d.getY() - m_pos.getY())**2
+                        return (0, dist_sq, depth)
+
+                return (0, 0.0, depth)
+
+            return (1, 0.0, depth)
+
+        # NOTE: Python triera d'abord par priorité (0 = cp, 1 = curve).
+        # En cas d'égalité sur des CPs (rayon touchant plusieurs grosses hitboxes),
+        # c'est celui dont le centre visuel est le plus proche de la souris qui gagnera.
+        entries.sort(key=get_priority_distance_depth)
 
         for entry in entries:
             np = entry.getIntoNodePath()
@@ -172,7 +185,6 @@ class MouseHandler:
     def _handle_hover(self, m_pos):
         """Processes ray picking to detect hovered curves."""
         hovered_tag = None
-        # CORRECTION : on demande une "curve" en format string
         hover_entry = self._pick_entry(m_pos, "curve")
         if hover_entry is not None:
             metadata = self._entry_metadata(hover_entry)
@@ -444,16 +456,22 @@ class MouseHandler:
         Returns:
             task.cont to keep the task alive.
         """
-        if self.base.mouseWatcherNode.hasMouse():
-            m_pos = self.base.mouseWatcherNode.getMouse()
-            curr_pos = Point2(m_pos.getX(), m_pos.getY())
-            left_down = self.base.mouseWatcherNode.isButtonDown(MouseButton.one())
+        if not self.base.mouseWatcherNode.hasMouse():
+            if self.dragging_cp:
+                # On finalise de force pour éviter de rester bloqué dans cet état
+                self._finalize_drag(self.drag_last_valid_world_pos)
+            self._left_was_down = False
+            self.prev_mouse_pos = None
+            return task.cont
+        m_pos = self.base.mouseWatcherNode.getMouse()
+        curr_pos = Point2(m_pos.getX(), m_pos.getY())
+        left_down = self.base.mouseWatcherNode.isButtonDown(MouseButton.one())
 
-            self._handle_hover(m_pos)
-            self._handle_curve_click(m_pos, left_down)
-            self._handle_cp_interaction(m_pos, left_down)
-            self._handle_drag(curr_pos)
-            self._left_was_down = left_down
+        self._handle_hover(m_pos)
+        self._handle_curve_click(m_pos, left_down)
+        self._handle_cp_interaction(m_pos, left_down)
+        self._handle_drag(curr_pos)
+        self._left_was_down = left_down
 
         return task.cont
 

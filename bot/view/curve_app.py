@@ -106,7 +106,6 @@ class CurveApp:
         return self.cp_node
 
     def _attachColissionNode(self):
-        # NETTOYAGE ABSOLU : On détruit l'ancien noeud et tous ses enfants
         if getattr(self, "curve_collision_node", None) is not None:
             self.curve_collision_node.removeNode()
 
@@ -129,7 +128,6 @@ class CurveApp:
         if self.control_points is None or getattr(self, "node_path", None) is None:
             return
 
-        # NETTOYAGE ABSOLU pour les points de contrôle
         if getattr(self, "cp_collision_node", None) is not None:
             self.cp_collision_node.removeNode()
 
@@ -154,11 +152,10 @@ class CurveApp:
             ptA = self.points[idxA]
             ptB = self.points[idxB]
 
-            # SÉCURITÉ PANDA3D MAXIMALE :
-            # Empêche la division par zéro et l'apparition des Hitboxes Infinies.
+            # NOTE: Empêche la division par zéro et l'apparition des Hitboxes Infinies.
             dist_sq = (ptA[0]-ptB[0])**2 + (ptA[1]-ptB[1])**2 + (ptA[2]-ptB[2])**2
             if dist_sq < 1e-5:
-                # Si le segment est microscopique, on ne lui donne pas de hitbox.
+                # NOTE: Si le segment est microscopique, on ne lui donne pas de hitbox.
                 continue
 
             tube = CollisionTube(ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius)
@@ -221,12 +218,12 @@ class CurveApp:
         else:
             self.cp_node.hide()
 
-        # SÉCURITÉ : On désactive physiquement les clics sur les points masqués
+        # NOTE : On désactive physiquement les clics sur les points masqués
         if self.cp_collision_node is not None:
             current_mask = MASK_CP_PICK if visible else BitMask32.allOff()
             for cnp in self.cp_collision_node.getChildren():
                 cnp.node().setIntoCollideMask(current_mask)
-                cnp.setCollideMask(current_mask) # Force la MAJ Panda3D
+                cnp.setCollideMask(current_mask)
 
     def preview_control_point(self, cp_index: int, new_pos: list[float]):
         if self.control_points is None:
@@ -254,10 +251,12 @@ class CurveApp:
 
 
     def update_collision_sizes(self, units_per_pixel: float):
-        self.curve_pick_radius = units_per_pixel * 6.0
-        self.cp_pick_radius = units_per_pixel * 12.0
+        safe_units = max(0.001, units_per_pixel)
 
-        # Le détachement/rattachement est la seule façon de garantir que
+        self.curve_pick_radius = safe_units * 6.0
+        self.cp_pick_radius = safe_units * 12.0
+
+        # NOTE: Le détachement/rattachement est la seule façon de garantir que
         # le CollisionTraverser mette à jour son arbre de recherche global.
         if self.node_path is not None:
             self._attachColissionNode()

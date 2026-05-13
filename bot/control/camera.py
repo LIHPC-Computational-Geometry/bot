@@ -30,7 +30,7 @@ class CameraController:
 
         # 1. Configuration de la Lentille Orthographique
         self.lens = OrthographicLens()
-        self.lens.setFilmSize(20, 20)
+        self.lens.setFilmSize(20)
         self.base.cam.node().setLens(self.lens)
 
         # 2. Hiérarchie : focal_node (Pivot) -> camera
@@ -77,7 +77,7 @@ class CameraController:
         self.model_center = center
         # 3. Ajuster la lentille avec une MARGE (ex: 1.2 pour 20% d'espace vide autour)
         view_size = radius * 2.2
-        self.lens.setFilmSize(view_size, view_size)
+        self.lens.setFilmSize(view_size)
 
         # 4. Adujst the limits of automatic zoom
         self.min_zoom = self.model_radius * 0.05
@@ -89,7 +89,7 @@ class CameraController:
 
         # 6. Ajuster la profondeur de rendu (Near/Far)
         # Très important pour ne pas que l'objet soit "tronçonné"
-        limit = max(10000.0, self.model_radius * 100.0)
+        limit = max(100.0, self.model_radius * 5)
         self.lens.setNear(-limit)
         self.lens.setFar(limit)
 
@@ -166,19 +166,19 @@ class CameraController:
         if self.is_animating:
             return
 
-        # 1. Calculer la nouvelle taille de vue
         current_size = self.lens.getFilmSize().getX()
         new_size = current_size * factor
 
-        # 2. Lever la restriction de taille (on garde une sécurité minimale)
         if 0.00001 < new_size < 100000:
-            self.lens.setFilmSize(new_size, new_size)
+            self.lens.setFilmSize(new_size)
 
             # 3. LEVIER DE RESTRICTION : On pousse les plans de coupe très loin
             # On s'assure que la profondeur de vue est 10x plus grande que l'objet
             # pour éviter tout "clipping" (disparition)
 
-            limit = max(10000.0, self.model_radius * 100.0)
+            # NOTE: J'ai réduit le max pour résoudre un problème de précision mathématique des Float32.
+            # La taille de limit d'origine était beaucoup trop grande max(10000.0, self.model_radius * 100.0)
+            limit = max(100.0, self.model_radius * 5)
             self.lens.setNear(-limit)
             self.lens.setFar(limit)
 
@@ -210,6 +210,10 @@ class CameraController:
     def _unlock(self):
         """Release the animation lock so user input is accepted again."""
         self.is_animating = False
+        current_size = self.lens.getFilmSize().getX()
+        if getattr(self, '_last_film_size', None) != current_size:
+            self._last_film_size = current_size
+            self.base.messenger.send("zoom_changed", [current_size])
 
     def align_to_plane(self, axis):
         """
@@ -289,9 +293,10 @@ class CameraController:
         if hasattr(self.scene, "gizmo"):
             self.scene.gizmo.update(self.base.camera.getQuat(self.base.render))
 
-        # Émission de l'événement de zoom
+        # Émission de l'événement de zoom uniquement si on n'anime pas
         current_size = self.lens.getFilmSize().getX()
         if getattr(self, '_last_film_size', None) != current_size:
             self._last_film_size = current_size
-            self.base.messenger.send("zoom_changed", [current_size])
+            if not self.is_animating:
+                self.base.messenger.send("zoom_changed", [current_size])
         return task.cont

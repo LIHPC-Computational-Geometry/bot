@@ -154,11 +154,19 @@ class Scene:
             lines.drawTo(*ptB)
 
             if not is_control_polygon:
-                radius = 1.0
-                tube = CollisionTube(
-                    ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius
-                )
-                cnode.addSolid(tube)
+                # NOTE: Calcul de la distance au carré (plus rapide qu'une racine carrée)
+                dx = ptA[0] - ptB[0]
+                dy = ptA[1] - ptB[1]
+                dz = ptA[2] - ptB[2]
+                dist_sq = dx*dx + dy*dy + dz*dz
+
+                # NOTE: Si les points sont distincts, on crée le tube
+                if dist_sq > 1e-8:
+                    radius = 1.0
+                    tube = CollisionTube(
+                        ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], radius
+                    )
+                    cnode.addSolid(tube)
 
         if is_control_polygon:
             unique_indices = dict.fromkeys(idx for edge in tag_edges for idx in edge)
@@ -393,6 +401,6 @@ class Scene:
     def _on_zoom_changed(self, film_size):
         """Met à jour le rayon de sélection pour qu'il reste constant à l'écran"""
         win_width = self.base.win.getXSize() or 1000
-        self.last_units_per_pixel = film_size / win_width # On stocke !
+        self.last_units_per_pixel = film_size / win_width
         for curve in self.curves.values():
             curve.update_collision_sizes(self.last_units_per_pixel)
