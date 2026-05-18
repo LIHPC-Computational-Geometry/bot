@@ -21,6 +21,7 @@ class TestRayPicker(unittest.TestCase):
         self.base = MagicMock()
         if _HAS_PANDA_DEPS:
             from panda3d.core import NodePath
+
             # Simulate attachNewNode by wrapping the CollisionNode in a real NodePath
             self.base.camera.attachNewNode.side_effect = lambda node: NodePath(node)
 
@@ -84,7 +85,7 @@ class TestRayPicker(unittest.TestCase):
         self.picker._get_priority_distance_depth = MagicMock(
             side_effect=[
                 (1, 0.0, 10.0),  # Priority for Curve
-                (0, 0.0, 5.0),   # Priority for CP
+                (0, 0.0, 5.0),  # Priority for CP
             ]
         )
 
@@ -102,7 +103,9 @@ class TestRayPicker(unittest.TestCase):
         self.assertEqual(meta["point"], "surface_point")
 
     def test_get_metadata_cp_with_center(self):
-        entry = self._make_mock_entry({"pick_kind": "cp", "curve_tag": "tag2", "cp_index": "5"})
+        entry = self._make_mock_entry(
+            {"pick_kind": "cp", "curve_tag": "tag2", "cp_index": "5"}
+        )
         solid = MagicMock()
         solid.getCenter.return_value = "center_point"
         entry.getInto.return_value = solid
@@ -118,7 +121,9 @@ class TestRayPicker(unittest.TestCase):
 
     def test_priority_distance_depth_curve(self):
         entry = self._make_mock_entry({"pick_kind": "curve"}, depth=8.0)
-        priority, dist, depth = self.picker._get_priority_distance_depth(entry, Point2(0, 0))
+        priority, dist, depth = self.picker._get_priority_distance_depth(
+            entry, Point2(0, 0)
+        )
         self.assertEqual(priority, 1)
         self.assertEqual(dist, 0.0)
         self.assertEqual(depth, 8.0)
@@ -135,7 +140,9 @@ class TestRayPicker(unittest.TestCase):
 
         self.base.camLens.project.side_effect = mock_project
 
-        priority, dist, depth = self.picker._get_priority_distance_depth(entry, Point2(1.0, 1.0))
+        priority, dist, depth = self.picker._get_priority_distance_depth(
+            entry, Point2(1.0, 1.0)
+        )
 
         self.assertEqual(priority, 0)
         # dist_sq = (2-1)^2 + (3-1)^2 = 1 + 4 = 5

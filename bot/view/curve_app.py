@@ -138,7 +138,6 @@ class CurveApp:
         cnp = self.curve_collision_node.attachNewNode(cnode)
         cnp.setTag("curve_tag", str(self.tag))
         cnp.setTag("pick_kind", "curve")
-        cnp.show()
         return cnp
 
     def _populate_curve_collision_solids(self, cnode: CollisionNode):
@@ -177,7 +176,6 @@ class CurveApp:
             cnp.setTag("curve_tag", str(self.tag))
             cnp.setTag("cp_index", str(i))
             cnp.setTag("pick_kind", "cp")
-            cnp.show()
 
     # =========================================================================
     # PARENT NODE MANAGEMENT AND UTILITIES
