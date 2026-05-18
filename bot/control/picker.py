@@ -65,13 +65,17 @@ class RayPicker:
                 point = self.base.render.getRelativePoint(np, solid.getCenter())
 
         return {
-            "curve_tag": np.getNetTag("curve_tag") if np.hasNetTag("curve_tag") else None,
+            "curve_tag": np.getNetTag("curve_tag")
+            if np.hasNetTag("curve_tag")
+            else None,
             "cp_index": np.getNetTag("cp_index") if np.hasNetTag("cp_index") else None,
             "pick_kind": pick_kind,
             "point": point,
         }
 
-    def _get_priority_distance_depth(self, entry: Any, m_pos: Point2) -> Tuple[int, float, float]:
+    def _get_priority_distance_depth(
+        self, entry: Any, m_pos: Point2
+    ) -> Tuple[int, float, float]:
         """Calculates the priority score for sorting collisions (favors CPs)."""
         np = entry.getIntoNodePath()
         pick_kind = np.getNetTag("pick_kind") if np.hasNetTag("pick_kind") else ""
@@ -83,7 +87,9 @@ class RayPicker:
                 cp_world = self.base.render.getRelativePoint(np, solid.getCenter())
                 p2d = Point2()
                 if self.base.camLens.project(cp_world, p2d):
-                    dist_sq = (p2d.getX() - m_pos.getX())**2 + (p2d.getY() - m_pos.getY())**2
+                    dist_sq = (p2d.getX() - m_pos.getX()) ** 2 + (
+                        p2d.getY() - m_pos.getY()
+                    ) ** 2
                     return (0, dist_sq, depth)
             return (0, 0.0, depth)
 

@@ -211,7 +211,7 @@ class CameraController:
         """Release the animation lock so user input is accepted again."""
         self.is_animating = False
         current_size = self.lens.getFilmSize().getX()
-        if getattr(self, '_last_film_size', None) != current_size:
+        if getattr(self, "_last_film_size", None) != current_size:
             self._last_film_size = current_size
             self.base.messenger.send("zoom_changed", [current_size])
 
@@ -295,7 +295,7 @@ class CameraController:
 
         # Émission de l'événement de zoom uniquement si on n'anime pas
         current_size = self.lens.getFilmSize().getX()
-        if getattr(self, '_last_film_size', None) != current_size:
+        if getattr(self, "_last_film_size", None) != current_size:
             self._last_film_size = current_size
             if not self.is_animating:
                 self.base.messenger.send("zoom_changed", [current_size])

@@ -1,8 +1,17 @@
 from typing import Dict, List, Optional
 from panda3d.core import (
-    BitMask32, CollisionNode, CollisionSphere, CollisionTube,
-    Geom, GeomNode, GeomPoints, GeomVertexData, GeomVertexFormat, GeomVertexWriter,
-    LineSegs, NodePath
+    BitMask32,
+    CollisionNode,
+    CollisionSphere,
+    CollisionTube,
+    Geom,
+    GeomNode,
+    GeomPoints,
+    GeomVertexData,
+    GeomVertexFormat,
+    GeomVertexWriter,
+    LineSegs,
+    NodePath,
 )
 import nurbslib
 import numpy as np
@@ -47,7 +56,9 @@ class CurveApp:
 
         if self.type in ("bezier", "bspline"):
             self.control_points = curve_data.get("control_points", [])
-            self.cp_color = [[0.5, 0.5, 0.5, 1.0] for _ in range(len(self.control_points))]
+            self.cp_color = [
+                [0.5, 0.5, 0.5, 1.0] for _ in range(len(self.control_points))
+            ]
             self.degree = curve_data.get("degree")
 
         if self.type == "bspline":
@@ -134,13 +145,15 @@ class CurveApp:
         """Generates collision tubes for the curve edges."""
         for idxA, idxB in self.edges:
             ptA, ptB = self.points[idxA], self.points[idxB]
-            dist_sq = sum((ptA[i] - ptB[i])**2 for i in range(3))
+            dist_sq = sum((ptA[i] - ptB[i]) ** 2 for i in range(3))
 
             # Avoids division by zero and infinite hitboxes
             if dist_sq < 1e-5:
                 continue
 
-            tube = CollisionTube(ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], self.curve_pick_radius)
+            tube = CollisionTube(
+                ptA[0], ptA[1], ptA[2], ptB[0], ptB[1], ptB[2], self.curve_pick_radius
+            )
             cnode.addSolid(tube)
 
     def rebuild_cp_collision(self):
@@ -198,10 +211,14 @@ class CurveApp:
 
     def _clean_nodes(self):
         """Cleans up all existing nodes before reinitialization."""
-        if self.curve_render_node: self.curve_render_node.removeNode()
-        if self.curve_collision_node: self.curve_collision_node.removeNode()
-        if self.cp_render_node: self.cp_render_node.removeNode()
-        if self.cp_collision_node: self.cp_collision_node.removeNode()
+        if self.curve_render_node:
+            self.curve_render_node.removeNode()
+        if self.curve_collision_node:
+            self.curve_collision_node.removeNode()
+        if self.cp_render_node:
+            self.cp_render_node.removeNode()
+        if self.cp_collision_node:
+            self.cp_collision_node.removeNode()
 
     def set_cp_color(self, cp_index: int, color: List[float]):
         self.cp_color[cp_index] = color
@@ -246,8 +263,10 @@ class CurveApp:
             self.points = pts.tolist()
             self.edges = [(i, i + 1) for i in range(len(self.points) - 1)]
 
-        if self.curve_render_node: self._draw_curve()
-        if self.cp_render_node: self._draw_control_points(self.cp_render_node)
+        if self.curve_render_node:
+            self._draw_curve()
+        if self.cp_render_node:
+            self._draw_control_points(self.cp_render_node)
 
     def update_collision_sizes(self, units_per_pixel: float):
         safe_units = max(0.001, units_per_pixel)

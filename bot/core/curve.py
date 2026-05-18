@@ -1,6 +1,7 @@
 import nurbslib
 import numpy as np
 
+
 class BezierCurve:
     """
     This class acts as a bridge between your current geometry and the Rust lib.
@@ -54,7 +55,11 @@ class BezierCurve:
 
     def get_render_data(self) -> dict:
         curve_pts = self._engine.evaluate(100, False)
-        if len(curve_pts.shape) == 2 and curve_pts.shape[0] in (2, 3) and curve_pts.shape[1] > 3:
+        if (
+            len(curve_pts.shape) == 2
+            and curve_pts.shape[0] in (2, 3)
+            and curve_pts.shape[1] > 3
+        ):
             curve_pts = curve_pts.T
         return {
             "tag": self.tag,

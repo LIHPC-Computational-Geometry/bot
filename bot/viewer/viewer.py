@@ -124,7 +124,7 @@ class Viewer:
     def set_axis_constraint(self, mask: int) -> "Viewer":
         try:
             normalized = int(mask)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             normalized = 7
         normalized = max(0, min(7, normalized))
         self._send("set_axis_constraint", {"mask": normalized})
@@ -256,7 +256,7 @@ class Viewer:
                             and self.on_cp_pick_end is not None
                         ):
                             self.on_cp_pick_end(data)
-                except (EOFError, BrokenPipeError, AttributeError):
+                except EOFError, BrokenPipeError, AttributeError:
                     break
                 except Exception:
                     pass
@@ -309,7 +309,7 @@ class Viewer:
             return
         try:
             normalized = int(tag)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return
         self.set_edit_mode(True, normalized)
         self.set_active_curve(normalized)

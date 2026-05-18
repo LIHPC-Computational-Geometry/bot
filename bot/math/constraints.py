@@ -1,6 +1,7 @@
 from typing import Optional, List, Tuple
 from panda3d.core import Plane, Point2, Point3, Vec3
 
+
 class ConstraintManager:
     """
     Manages 3D mouse projection mathematics and axis constraints.
@@ -43,7 +44,9 @@ class ConstraintManager:
         if mask in (1, 2, 4):
             axis_map = {1: Vec3(1, 0, 0), 2: Vec3(0, 1, 0), 4: Vec3(0, 0, 1)}
             axis_origin = Point3(*start)
-            result = self._closest_point_on_axis_to_ray(ray_origin, ray_dir, axis_origin, axis_map[mask])
+            result = self._closest_point_on_axis_to_ray(
+                ray_origin, ray_dir, axis_origin, axis_map[mask]
+            )
             if result is not None:
                 return result
             return self._apply_axis_constraint(start, self._mouse_to_plane(m_pos))
@@ -86,23 +89,32 @@ class ConstraintManager:
             return None
 
         hit = Point3()
-        if self.drag_plane.intersectsLine(hit, ray_origin, ray_origin + ray_dir * 1000000.0):
+        if self.drag_plane.intersectsLine(
+            hit, ray_origin, ray_origin + ray_dir * 1000000.0
+        ):
             return [hit[0], hit[1], hit[2]]
         return None
 
-    def _apply_axis_constraint(self, start_pos: List[float], candidate_pos: Optional[List[float]]) -> Optional[List[float]]:
+    def _apply_axis_constraint(
+        self, start_pos: List[float], candidate_pos: Optional[List[float]]
+    ) -> Optional[List[float]]:
         if start_pos is None or candidate_pos is None:
             return candidate_pos
         if self.axis_constraint_mask == 0:
             return list(start_pos)
 
         constrained = list(candidate_pos)
-        if not (self.axis_constraint_mask & 1): constrained[0] = start_pos[0]
-        if not (self.axis_constraint_mask & 2): constrained[1] = start_pos[1]
-        if not (self.axis_constraint_mask & 4): constrained[2] = start_pos[2]
+        if not (self.axis_constraint_mask & 1):
+            constrained[0] = start_pos[0]
+        if not (self.axis_constraint_mask & 2):
+            constrained[1] = start_pos[1]
+        if not (self.axis_constraint_mask & 4):
+            constrained[2] = start_pos[2]
         return constrained
 
-    def _closest_point_on_axis_to_ray(self, ray_origin, ray_dir, axis_origin, axis_dir) -> Optional[List[float]]:
+    def _closest_point_on_axis_to_ray(
+        self, ray_origin, ray_dir, axis_origin, axis_dir
+    ) -> Optional[List[float]]:
         w0 = ray_origin - axis_origin
         a = ray_dir.dot(ray_dir)
         b = ray_dir.dot(axis_dir)
@@ -117,7 +129,12 @@ class ConstraintManager:
         return [hit[0], hit[1], hit[2]]
 
     def _plane_normal_from_mask(self, mask: int) -> Optional[Vec3]:
-        if mask == 3: return Vec3(0, 0, 1)  # noqa: E701
-        if mask == 5: return Vec3(0, 1, 0)  # noqa: E701
-        if mask == 6: return Vec3(1, 0, 0)  # noqa: E701
-        return None
+        match mask:
+            case 3:
+                return Vec3(0, 0, 1)
+            case 5:
+                return Vec3(0, 1, 0)
+            case 6:
+                return Vec3(1, 0, 0)
+            case _:
+                return None

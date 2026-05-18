@@ -61,7 +61,9 @@ class Scene:
         self.base = base
         self._geom_data = geom_data
 
-        self.background_color: List[float] = settings.get("background_color", [0.1, 0.1, 0.12])
+        self.background_color: List[float] = settings.get(
+            "background_color", [0.1, 0.1, 0.12]
+        )
         self.base.set_background_color(self.background_color)
 
         self.line_thickness: float = float(settings.get("line_thickness", 2.0))
@@ -79,10 +81,14 @@ class Scene:
         self.last_units_per_pixel: float = 0.01
 
         # Scene root nodes
-        self._constraint_guide_np = self.base.render.attachNewNode("constraint_guide_root")
+        self._constraint_guide_np = self.base.render.attachNewNode(
+            "constraint_guide_root"
+        )
         self._constraint_guide_np.hide()
         self._world_axes_np = self.base.render.attachNewNode("world_axes_root")
-        self._transform_gizmo_np = self.base.render.attachNewNode("transform_gizmo_root")
+        self._transform_gizmo_np = self.base.render.attachNewNode(
+            "transform_gizmo_root"
+        )
         self._transform_gizmo_np.hide()
 
         self.geom_node = self._build_from_data(geom_data)
@@ -100,7 +106,7 @@ class Scene:
         """Safe utility to retrieve a curve by its tag."""
         try:
             return self.curves.get(int(tag))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     def _build_from_data(self, geom_data: Dict[str, Any]) -> NodePath:
@@ -153,7 +159,7 @@ class Scene:
         """Sets the currently selected curve for editing."""
         try:
             normalized = int(tag) if tag is not None else None
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             normalized = None
 
         self.active_curve_tag = normalized
@@ -172,7 +178,9 @@ class Scene:
     def set_axis_constraint(self, mask: int):
         self.axis_constraint_mask = max(0, min(7, int(mask)))
         if self._constraint_guide_visible and self._constraint_guide_origin is not None:
-            self.update_axis_guide(self._constraint_guide_origin, self.axis_constraint_mask)
+            self.update_axis_guide(
+                self._constraint_guide_origin, self.axis_constraint_mask
+            )
 
     # =========================================================================
     # VISUAL AXIS GUIDES MANAGEMENT (TRANSFORM GIZMO)
@@ -183,7 +191,9 @@ class Scene:
         max_size = max(size) if size else 1.0
         return max(2.0, float(max_size) * 0.15)
 
-    def _draw_axis_line(self, root: NodePath, origin: List[float], axis: str, length: float):
+    def _draw_axis_line(
+        self, root: NodePath, origin: List[float], axis: str, length: float
+    ):
         colors = {"x": (1, 0, 0, 0.2), "y": (0, 1, 0, 0.2), "z": (0, 0, 1, 0.2)}
         vectors = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}
 
@@ -194,8 +204,12 @@ class Scene:
         ls.setThickness(2.0)
         ls.setColor(*color)
 
-        ls.moveTo(origin[0] - vx * length, origin[1] - vy * length, origin[2] - vz * length)
-        ls.drawTo(origin[0] + vx * length, origin[1] + vy * length, origin[2] + vz * length)
+        ls.moveTo(
+            origin[0] - vx * length, origin[1] - vy * length, origin[2] - vz * length
+        )
+        ls.drawTo(
+            origin[0] + vx * length, origin[1] + vy * length, origin[2] + vz * length
+        )
 
         root.attachNewNode(ls.create())
 
@@ -206,9 +220,12 @@ class Scene:
         self._transform_gizmo_np.getChildren().detach()
         length = self._guide_length()
 
-        if mask & 1: self._draw_axis_line(self._transform_gizmo_np, origin, "x", length)
-        if mask & 2: self._draw_axis_line(self._transform_gizmo_np, origin, "y", length)
-        if mask & 4: self._draw_axis_line(self._transform_gizmo_np, origin, "z", length)
+        if mask & 1:
+            self._draw_axis_line(self._transform_gizmo_np, origin, "x", length)
+        if mask & 2:
+            self._draw_axis_line(self._transform_gizmo_np, origin, "y", length)
+        if mask & 4:
+            self._draw_axis_line(self._transform_gizmo_np, origin, "z", length)
 
     def show_axis_guide(self, origin: List[float], mask: int):
         self._constraint_guide_visible = True
@@ -225,9 +242,12 @@ class Scene:
         self._constraint_guide_np.getChildren().detach()
 
         length = self._guide_length()
-        if mask & 1: self._draw_axis_line(self._constraint_guide_np, origin, "x", length)
-        if mask & 2: self._draw_axis_line(self._constraint_guide_np, origin, "y", length)
-        if mask & 4: self._draw_axis_line(self._constraint_guide_np, origin, "z", length)
+        if mask & 1:
+            self._draw_axis_line(self._constraint_guide_np, origin, "x", length)
+        if mask & 2:
+            self._draw_axis_line(self._constraint_guide_np, origin, "y", length)
+        if mask & 4:
+            self._draw_axis_line(self._constraint_guide_np, origin, "z", length)
 
         self._update_transform_gizmo(origin, mask)
 
@@ -253,13 +273,22 @@ class Scene:
 
     def clear(self):
         """Cleans up all scene nodes."""
-        for attr in ['geom_node', '_constraint_guide_np', '_world_axes_np', '_transform_gizmo_np']:
+        for attr in [
+            "geom_node",
+            "_constraint_guide_np",
+            "_world_axes_np",
+            "_transform_gizmo_np",
+        ]:
             np = getattr(self, attr, None)
             if np is not None:
                 np.removeNode()
                 setattr(self, attr, None)
 
-        if hasattr(self, "gizmo") and self.gizmo is not None and hasattr(self.gizmo, "root"):
+        if (
+            hasattr(self, "gizmo")
+            and self.gizmo is not None
+            and hasattr(self.gizmo, "root")
+        ):
             self.gizmo.root.removeNode()
 
     def apply_settings(self, settings: Dict[str, Any]):
