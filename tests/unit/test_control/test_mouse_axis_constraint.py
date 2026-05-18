@@ -6,6 +6,7 @@ from panda3d.core import Plane, Point2, Point3, Vec3
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from unittest.mock import MagicMock
+
 try:
     from bot.control.mouse import MouseHandler
     from bot.math.constraints import ConstraintManager
@@ -37,14 +38,18 @@ class TestMouseAxisConstraint(unittest.TestCase):
         start = [1.0, 2.0, 3.0]
         candidate = [9.0, 8.0, 7.0]
         self.assertEqual(
-            handler.constraints._apply_axis_constraint(start, candidate), [1.0, 2.0, 7.0]
+            handler.constraints._apply_axis_constraint(start, candidate),
+            [1.0, 2.0, 7.0],
         )
 
     def test_mask_three_keeps_xy(self):
         handler = self._make_handler(3)
         start = [1.0, 2.0, 3.0]
         candidate = [9.0, 8.0, 7.0]
-        self.assertEqual(handler.constraints._apply_axis_constraint(start, candidate), [9.0, 8.0, 3.0])
+        self.assertEqual(
+            handler.constraints._apply_axis_constraint(start, candidate),
+            [9.0, 8.0, 3.0],
+        )
 
     def test_mask_seven_keeps_all_axes(self):
         handler = self._make_handler(7)
@@ -57,7 +62,6 @@ class TestMouseAxisConstraint(unittest.TestCase):
 
 @unittest.skipUnless(_HAS_PANDA_DEPS, "Panda3D runtime dependencies not installed")
 class TestConstraintManager(unittest.TestCase):
-
     def setUp(self):
         # Mocking base for ConstraintManager
         mock_base = MagicMock()
@@ -103,7 +107,9 @@ class TestConstraintManager(unittest.TestCase):
         Ray: Y-axis. Axis: a line parallel to Z-axis at (1,0,0).
         Closest point on the axis should be (1,0,0).
         """
-        hit = self.manager._closest_point_on_axis_to_ray(Point3(0, 0, 0), Vec3(0, 1, 0), Point3(1, 0, 0), Vec3(0, 0, 1))
+        hit = self.manager._closest_point_on_axis_to_ray(
+            Point3(0, 0, 0), Vec3(0, 1, 0), Point3(1, 0, 0), Vec3(0, 0, 1)
+        )
         self.assertEqual(hit, [1.0, 0.0, 0.0])
 
     def test_closest_point_on_axis_to_ray_parallel(self):
@@ -165,8 +171,12 @@ class TestConstraintManager(unittest.TestCase):
     def test_mouse_to_constrained_axis_single_axis_success(self):
         self.manager.drag_start_world_pos = [1.0, 2.0, 3.0]
         self.manager.drag_active_mask = 1  # X-axis
-        self.manager._mouse_to_ray = MagicMock(return_value=(Point3(0, 0, 0), Vec3(1, 0, 0)))
-        self.manager._closest_point_on_axis_to_ray = MagicMock(return_value=[5.0, 2.0, 3.0])
+        self.manager._mouse_to_ray = MagicMock(
+            return_value=(Point3(0, 0, 0), Vec3(1, 0, 0))
+        )
+        self.manager._closest_point_on_axis_to_ray = MagicMock(
+            return_value=[5.0, 2.0, 3.0]
+        )
         result = self.manager.mouse_to_constrained_axis(Point2(0, 0))
         self.assertEqual(result, [5.0, 2.0, 3.0])
         self.manager._closest_point_on_axis_to_ray.assert_called_once()
@@ -174,7 +184,9 @@ class TestConstraintManager(unittest.TestCase):
     def test_mouse_to_constrained_axis_single_axis_fallback(self):
         self.manager.drag_start_world_pos = [1.0, 2.0, 3.0]
         self.manager.drag_active_mask = 2  # Y-axis
-        self.manager._mouse_to_ray = MagicMock(return_value=(Point3(0, 0, 0), Vec3(1, 0, 0)))
+        self.manager._mouse_to_ray = MagicMock(
+            return_value=(Point3(0, 0, 0), Vec3(1, 0, 0))
+        )
         self.manager._closest_point_on_axis_to_ray = MagicMock(return_value=None)
         self.manager._mouse_to_plane = MagicMock(return_value=[0, 0, 0])
         self.manager._apply_axis_constraint = MagicMock(return_value=[1.0, 9.0, 3.0])
@@ -187,7 +199,9 @@ class TestConstraintManager(unittest.TestCase):
         self.manager.drag_start_world_pos = [1.0, 2.0, 3.0]
         self.manager.drag_active_mask = 3  # XY plane (Normal Z)
         # Ray straight down Z axis from (5, 5, 10) to the plane at Z=3
-        self.manager._mouse_to_ray = MagicMock(return_value=(Point3(5.0, 5.0, 10.0), Vec3(0, 0, -1)))
+        self.manager._mouse_to_ray = MagicMock(
+            return_value=(Point3(5.0, 5.0, 10.0), Vec3(0, 0, -1))
+        )
 
         result = self.manager.mouse_to_constrained_axis(Point2(0, 0))
         self.assertIsNotNone(result)
@@ -199,7 +213,9 @@ class TestConstraintManager(unittest.TestCase):
         self.manager.drag_start_world_pos = [1.0, 2.0, 3.0]
         self.manager.drag_active_mask = 3  # XY plane
         # Ray parallel to XY plane (e.g., along X axis) won't intersect
-        self.manager._mouse_to_ray = MagicMock(return_value=(Point3(0, 0, 10), Vec3(1, 0, 0)))
+        self.manager._mouse_to_ray = MagicMock(
+            return_value=(Point3(0, 0, 10), Vec3(1, 0, 0))
+        )
         self.manager._mouse_to_plane = MagicMock(return_value=[0, 0, 0])
         self.manager._apply_axis_constraint = MagicMock(return_value=[4.0, 4.0, 3.0])
 
@@ -223,7 +239,9 @@ class TestConstraintManager(unittest.TestCase):
         self.manager.drag_plane = Plane(Vec3(0, 1, 0), Point3(0, 5, 0))
 
         # Ray starts at (0,0,0) and goes along the Y axis
-        self.manager._mouse_to_ray = MagicMock(return_value=(Point3(0, 0, 0), Vec3(0, 1, 0)))
+        self.manager._mouse_to_ray = MagicMock(
+            return_value=(Point3(0, 0, 0), Vec3(0, 1, 0))
+        )
 
         result = self.manager._mouse_to_plane(Point2(0, 0))
 
@@ -237,7 +255,9 @@ class TestConstraintManager(unittest.TestCase):
         self.manager.drag_plane = Plane(Vec3(0, 1, 0), Point3(0, 5, 0))
 
         # Ray starts at (0,0,0) and goes along the X axis (parallel to plane)
-        self.manager._mouse_to_ray = MagicMock(return_value=(Point3(0, 0, 0), Vec3(1, 0, 0)))
+        self.manager._mouse_to_ray = MagicMock(
+            return_value=(Point3(0, 0, 0), Vec3(1, 0, 0))
+        )
 
         result = self.manager._mouse_to_plane(Point2(0, 0))
         self.assertIsNone(result)
@@ -255,6 +275,7 @@ class TestConstraintManager(unittest.TestCase):
         Tests _mouse_to_ray with a successful extrusion where the ray is not
         parallel to the camera's XY plane.
         """
+
         # This simulates the extrude method filling in p_from and p_to
         def mock_extrude(m_pos, p_from, p_to):
             p_from.x, p_from.y, p_from.z = 0, -10, 0
@@ -283,6 +304,7 @@ class TestConstraintManager(unittest.TestCase):
         Tests _mouse_to_ray with a successful extrusion where the ray is
         parallel to the camera's XY plane (dir_cam.y is zero).
         """
+
         def mock_extrude(m_pos, p_from, p_to):
             p_from.x, p_from.y, p_from.z = -10, 5, 0
             p_to.x, p_to.y, p_to.z = 10, 5, 0
