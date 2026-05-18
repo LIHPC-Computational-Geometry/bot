@@ -7,6 +7,7 @@ Python bridge and logic without requiring the compiled engine.
 
 import unittest
 from unittest.mock import MagicMock, patch
+import numpy as np
 
 from bot.core.curve import BezierCurve
 
@@ -22,7 +23,7 @@ class TestBezierCurve(unittest.TestCase):
 
         # 2. Mock configuration to simulate the nurbslib engine
         mock_engine_instance = MagicMock()
-        mock_engine_instance.get_control_points.return_value = control_points
+        mock_engine_instance.get_control_points.return_value = np.array(control_points)
         mock_engine_instance.get_degree.return_value = degree
         mock_nurbslib.PyBezierCurve.return_value = mock_engine_instance
 
@@ -35,9 +36,11 @@ class TestBezierCurve(unittest.TestCase):
         self.assertEqual(curve.get_degree(), degree)
 
         # Ensure the Rust engine was called with the correct arguments
-        mock_nurbslib.PyBezierCurve.assert_called_once_with(
-            degree, control_points, None
-        )
+        mock_nurbslib.PyBezierCurve.assert_called_once()
+        args, kwargs = mock_nurbslib.PyBezierCurve.call_args
+        self.assertEqual(args[0], degree)
+        np.testing.assert_array_equal(args[1], np.array(control_points))
+        self.assertIsNone(args[2])
 
     def test_default_control_points_default_degree(self):
         """Tests that the method uses default degree 3 if not specified."""
@@ -103,9 +106,9 @@ class TestBezierCurve(unittest.TestCase):
 
         # Mock configuration
         mock_engine_instance = MagicMock()
-        mock_engine_instance.get_control_points.return_value = control_points
+        mock_engine_instance.get_control_points.return_value = np.array(control_points)
         mock_engine_instance.get_degree.return_value = degree
-        mock_engine_instance.evaluate.return_value = mock_curve_eval
+        mock_engine_instance.evaluate.return_value = np.array(mock_curve_eval)
         mock_nurbslib.PyBezierCurve.return_value = mock_engine_instance
 
         # Object creation and data retrieval
