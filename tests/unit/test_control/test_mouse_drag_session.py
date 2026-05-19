@@ -17,6 +17,7 @@ except ModuleNotFoundError:
 
 class _FakeScene:
     """A fake scene for testing mouse interactions without Panda3D rendering."""
+
     def __init__(self):
         self.hidden = False
         self.curves = {}
@@ -45,6 +46,7 @@ class _FakeScene:
 
 class _FakeBase:
     """A fake Panda3D ShowBase for testing without the full engine."""
+
     def __init__(self):
         self._scene = _FakeScene()
         self.events = []
