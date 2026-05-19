@@ -8,11 +8,20 @@ from bot.math.constraints import ConstraintManager
 
 class MouseHandler:
     """
-    Contrôleur d'interactions de la souris. Gère les drag & drop, la rotation caméra,
-    et délègue le picking et les contraintes mathématiques.
+    Handles mouse input and dispatches camera commands via the Panda3D messenger.
+
+    - Left-button drag          → ``cmd_rotate``
+    - Shift + left-button drag  → ``cmd_pan``
+    - Scroll wheel              → ``cmd_zoom``
     """
 
     def __init__(self, base):
+        """
+        Register mouse-wheel bindings and start the per-frame update task.
+
+        Args:
+            base: Panda3D ShowBase instance.
+        """
         self.base = base
         self.prev_mouse_pos = None
         self._left_was_down = False
