@@ -1,7 +1,6 @@
 from direct.showbase.InputStateGlobal import inputState
 from panda3d.core import MouseButton, Point2, Point3
 
-# Importons nos nouveaux modules (Assure-toi que les chemins correspondent à ton projet)
 from bot.control.picker import RayPicker
 from bot.math.constraints import ConstraintManager
 
