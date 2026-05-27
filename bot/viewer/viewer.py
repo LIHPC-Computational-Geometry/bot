@@ -12,7 +12,7 @@ import multiprocessing as mp
 import threading
 from typing import Any, Callable, Optional, TYPE_CHECKING
 
-from bot.core.curve import BezierCurve
+from bot.core.rust_block import SplineModel
 
 if TYPE_CHECKING:
     from bot.core.cad import Model
@@ -124,7 +124,7 @@ class Viewer:
     def set_axis_constraint(self, mask: int) -> "Viewer":
         try:
             normalized = int(mask)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             normalized = 7
         normalized = max(0, min(7, normalized))
         self._send("set_axis_constraint", {"mask": normalized})
@@ -256,7 +256,7 @@ class Viewer:
                             and self.on_cp_pick_end is not None
                         ):
                             self.on_cp_pick_end(data)
-                except EOFError, BrokenPipeError, AttributeError:
+                except (EOFError, BrokenPipeError, AttributeError):
                     break
                 except Exception:
                     pass
@@ -309,7 +309,7 @@ class Viewer:
             return
         try:
             normalized = int(tag)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return
         self.set_edit_mode(True, normalized)
         self.set_active_curve(normalized)
@@ -333,10 +333,10 @@ class Viewer:
             tag = int(self._default_last_hovered)
             if self.model is not None:
                 coords_a, coords_b = self.model.get_end_points_coords(int(tag))
-                control_points = BezierCurve._default_control_points(
+                control_points = SplineModel._default_control_points(
                     coords_a, coords_b, degree
                 )
-                curve = BezierCurve(tag, control_points, degree)
+                curve = SplineModel(tag, control_points, degree)
                 self.model.set_curve(tag, curve)
             else:
                 self.set_hud_text("Impossible to convert: no model loaded")

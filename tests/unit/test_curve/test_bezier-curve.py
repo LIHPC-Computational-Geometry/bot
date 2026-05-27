@@ -1,7 +1,7 @@
 """
 Unit tests for bot.core.curve.BezierCurve.
 
-The external Rust dependency (nurbslib) is mocked to allow testing the
+The external Rust dependency (ferrispline) is mocked to allow testing the
 Python bridge and logic without requiring the compiled engine.
 """
 
@@ -13,7 +13,7 @@ from bot.core.curve import BezierCurve
 
 
 class TestBezierCurve(unittest.TestCase):
-    @patch("bot.core.curve.nurbslib")
+    @patch("bot.core.rust_block.ferrispline")
     def test_initialization_and_attributes(self, mock_nurbslib):
         """Tests the initialization of the curve and access to its basic attributes."""
         # 1. Data preparation
@@ -21,11 +21,11 @@ class TestBezierCurve(unittest.TestCase):
         control_points = [[0.0, 0.0, 0.0], [5.0, 5.0, 0.0], [10.0, 0.0, 0.0]]
         degree = 2
 
-        # 2. Mock configuration to simulate the nurbslib engine
-        mock_engine_instance = MagicMock()
-        mock_engine_instance.get_control_points.return_value = np.array(control_points)
-        mock_engine_instance.get_degree.return_value = degree
-        mock_nurbslib.PyBezierCurve.return_value = mock_engine_instance
+        # 2. Mock configuration to simulate the ferrispline engine
+        mock_model_instance = MagicMock()
+        mock_model_instance.create_bezier.return_value = "curve-1"
+        mock_model_instance.evaluate.return_value = np.array(control_points)
+        mock_nurbslib.PyModel.return_value = mock_model_instance
 
         # 3. Object creation
         curve = BezierCurve(tag, control_points, degree)
@@ -35,9 +35,9 @@ class TestBezierCurve(unittest.TestCase):
         self.assertEqual(curve.get_control_points(), control_points)
         self.assertEqual(curve.get_degree(), degree)
 
-        # Ensure the Rust engine was called with the correct arguments
-        mock_nurbslib.PyBezierCurve.assert_called_once()
-        args, kwargs = mock_nurbslib.PyBezierCurve.call_args
+        # Ensure the Rust model was called with the correct arguments
+        mock_nurbslib.PyModel.assert_called_once()
+        args, kwargs = mock_model_instance.create_bezier.call_args
         self.assertEqual(args[0], degree)
         np.testing.assert_array_equal(args[1], np.array(control_points))
         self.assertIsNone(args[2])
@@ -94,7 +94,7 @@ class TestBezierCurve(unittest.TestCase):
         self.assertEqual(len(pts), 1)
         self.assertEqual(pts[0], coords_a)
 
-    @patch("bot.core.curve.nurbslib")
+    @patch("bot.core.rust_block.ferrispline")
     def test_get_render_data(self, mock_nurbslib):
         """Tests the structure and content of the render dictionary (used by the viewer)."""
         tag = "42"
@@ -105,11 +105,10 @@ class TestBezierCurve(unittest.TestCase):
         mock_curve_eval = [[0.0, 0.0, 0.0], [0.5, 0.5, 0.5], [1.0, 1.0, 1.0]]
 
         # Mock configuration
-        mock_engine_instance = MagicMock()
-        mock_engine_instance.get_control_points.return_value = np.array(control_points)
-        mock_engine_instance.get_degree.return_value = degree
-        mock_engine_instance.evaluate.return_value = np.array(mock_curve_eval)
-        mock_nurbslib.PyBezierCurve.return_value = mock_engine_instance
+        mock_model_instance = MagicMock()
+        mock_model_instance.create_bezier.return_value = "curve-42"
+        mock_model_instance.evaluate.return_value = np.array(mock_curve_eval)
+        mock_nurbslib.PyModel.return_value = mock_model_instance
 
         # Object creation and data retrieval
         curve = BezierCurve(tag, control_points, degree)
@@ -128,7 +127,7 @@ class TestBezierCurve(unittest.TestCase):
         self.assertEqual(data["curve"], mock_curve_eval)
 
         # Ensure the engine was called to generate 100 points
-        mock_engine_instance.evaluate.assert_called_once_with(100, False)
+        mock_model_instance.evaluate.assert_called_once_with("curve-42", 100)
 
 
 if __name__ == "__main__":

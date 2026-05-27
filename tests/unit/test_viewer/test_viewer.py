@@ -249,8 +249,8 @@ class TestViewerBezierInteractions(unittest.TestCase):
 
         return viewer
 
-    @patch("bot.viewer.viewer.BezierCurve")
-    def test_bezier_conversion_success(self, MockBezierCurve):
+    @patch("bot.viewer.viewer.SplineModel")
+    def test_bezier_conversion_success(self, MockSplineModel):
         """Verifies the conversion of a classic curve into a Bezier curve."""
         viewer = self._make_viewer_with_mocks()
 
@@ -262,27 +262,27 @@ class TestViewerBezierInteractions(unittest.TestCase):
         viewer.model.get_end_points_coords.return_value = [coords_a, coords_b]
 
         # Mock configuration for the static method _default_control_points
-        MockBezierCurve._default_control_points.return_value = [
+        MockSplineModel._default_control_points.return_value = [
             coords_a,
             [3.3, 0, 0],
             [6.6, 0, 0],
             coords_b,
         ]
 
-        # Configuration of the mocked instance returned by BezierCurve(...)
+        # Configuration of the mocked instance returned by SplineModel(...)
         mock_curve_instance = MagicMock()
-        MockBezierCurve.return_value = mock_curve_instance
+        MockSplineModel.return_value = mock_curve_instance
 
         # Method call
         viewer.bezier_conversion(degree)
 
         # Assertions
         viewer.model.get_end_points_coords.assert_called_once_with(42)
-        MockBezierCurve._default_control_points.assert_called_once_with(
+        MockSplineModel._default_control_points.assert_called_once_with(
             coords_a, coords_b, degree
         )
-        MockBezierCurve.assert_called_once_with(
-            42, MockBezierCurve._default_control_points.return_value, degree
+        MockSplineModel.assert_called_once_with(
+            42, MockSplineModel._default_control_points.return_value, degree
         )
         viewer.model.set_curve.assert_called_once_with(42, mock_curve_instance)
 
