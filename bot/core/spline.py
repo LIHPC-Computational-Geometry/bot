@@ -48,7 +48,7 @@ class SplineModel:
     def set_control_points(self, control_points: list[list[float]]):
         cp_array = np.array(control_points, dtype=np.float64)
         self._control_points_cache = cp_array.tolist()
-        self._curve_id = self._model.create_bezier(self._degree, cp_array, None)
+        self._curve_id = self._model.create_spline(self._degree, cp_array, None)
 
     def _evaluate(self, sample: int):
         if self._curve_id is None:

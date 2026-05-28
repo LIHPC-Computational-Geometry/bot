@@ -1,4 +1,4 @@
-import nurbslib
+import ferrispline as ferr
 import numpy as np
 
 
@@ -10,7 +10,7 @@ class BezierCurve:
     def __init__(self, tag: str, control_points: list[list[float]], degree: int):
         self.tag = tag
         cp_array = np.array(control_points, dtype=np.float64)
-        self._engine = nurbslib.PyBezierCurve(degree, cp_array, None)
+        self._engine = ferr.PyBezierCurve(degree, cp_array, None)
 
     @staticmethod
     def _default_control_points(coords_a, coords_b, degree=3):
@@ -51,7 +51,7 @@ class BezierCurve:
     def set_control_points(self, control_points: list[list[float]]):
         """Replace the internal curve engine with updated control points."""
         cp_array = np.array(control_points, dtype=np.float64)
-        self._engine = nurbslib.PyBezierCurve(self.get_degree(), cp_array, None)
+        self._engine = ferr.PyBezierCurve(self.get_degree(), cp_array, None)
 
     def get_render_data(self) -> dict:
         curve_pts = self._engine.evaluate(100, False)
