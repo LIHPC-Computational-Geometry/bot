@@ -3,7 +3,8 @@ from __future__ import annotations
 import ferrispline
 import numpy as np
 
-class SplineModel():
+
+class SplineModel:
     """
     Public curve wrapper backed by ferrispline.PyModel.
 
