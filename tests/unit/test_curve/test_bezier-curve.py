@@ -13,7 +13,7 @@ from bot.core.curve import BezierCurve
 
 
 class TestBezierCurve(unittest.TestCase):
-    @patch("bot.core.rust_block.ferrispline")
+    @patch("bot.core.spline.ferrispline")
     def test_initialization_and_attributes(self, mock_nurbslib):
         """Tests the initialization of the curve and access to its basic attributes."""
         # 1. Data preparation
@@ -94,7 +94,7 @@ class TestBezierCurve(unittest.TestCase):
         self.assertEqual(len(pts), 1)
         self.assertEqual(pts[0], coords_a)
 
-    @patch("bot.core.rust_block.ferrispline")
+    @patch("bot.core.spline.ferrispline")
     def test_get_render_data(self, mock_nurbslib):
         """Tests the structure and content of the render dictionary (used by the viewer)."""
         tag = "42"

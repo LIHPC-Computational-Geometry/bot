@@ -12,7 +12,7 @@ import multiprocessing as mp
 import threading
 from typing import Any, Callable, Optional, TYPE_CHECKING
 
-from bot.core.rust_block import SplineModel
+from bot.core.spline import SplineModel
 
 if TYPE_CHECKING:
     from bot.core.cad import Model

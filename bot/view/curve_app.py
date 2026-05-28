@@ -14,7 +14,7 @@ from panda3d.core import (
     NodePath,
 )
 import numpy as np
-from bot.core.rust_block import SplineModel
+from bot.core.spline import SplineModel
 
 MASK_CURVE_PICK = BitMask32.bit(1)
 MASK_CP_PICK = BitMask32.bit(2)
