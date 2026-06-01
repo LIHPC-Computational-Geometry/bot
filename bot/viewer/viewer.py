@@ -12,7 +12,7 @@ import multiprocessing as mp
 import threading
 from typing import Any, Callable, Optional, TYPE_CHECKING
 
-from bot.core.curve import BezierCurve
+from bot.core.spline import SplineModel
 
 if TYPE_CHECKING:
     from bot.core.cad import Model
@@ -333,10 +333,10 @@ class Viewer:
             tag = int(self._default_last_hovered)
             if self.model is not None:
                 coords_a, coords_b = self.model.get_end_points_coords(int(tag))
-                control_points = BezierCurve._default_control_points(
+                control_points = SplineModel._default_control_points(
                     coords_a, coords_b, degree
                 )
-                curve = BezierCurve(tag, control_points, degree)
+                curve = SplineModel(tag, control_points, degree)
                 self.model.set_curve(tag, curve)
             else:
                 self.set_hud_text("Impossible to convert: no model loaded")

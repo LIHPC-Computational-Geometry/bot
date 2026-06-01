@@ -27,7 +27,7 @@ source = { editable = "." }
 dependencies = [
     { name = "gmsh" },
     { name = "ipython" },
-    { name = "nurbslib" },
+    { name = "ferrispline" },
     { name = "panda3d" },
 ]
 
@@ -48,7 +48,7 @@ dev = [
 requires-dist = [
     { name = "gmsh", specifier = ">=4.15.0" },
     { name = "ipython", specifier = ">=9.10.0" },
-    { name = "nurbslib", directory = "ferrispline/nurbslib" },
+    { name = "ferrispline", directory = "ferrispline/python" },
     { name = "panda3d", specifier = ">=1.10.16" },
 ]
 
@@ -561,8 +561,8 @@ wheels = [
 ]
 
 [[package]]
-name = "nurbslib"
-source = { directory = "ferrispline/nurbslib" }
+name = "ferrispline"
+source = { directory = "ferrispline/python" }
 dependencies = [
     { name = "maturin" },
 ]

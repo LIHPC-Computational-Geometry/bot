@@ -13,8 +13,8 @@ from panda3d.core import (
     LineSegs,
     NodePath,
 )
-import nurbslib
 import numpy as np
+from bot.core.spline import SplineModel
 
 MASK_CURVE_PICK = BitMask32.bit(1)
 MASK_CP_PICK = BitMask32.bit(2)
@@ -251,10 +251,8 @@ class CurveApp:
         self.control_points[cp_index] = [new_pos[0], new_pos[1], new_pos[2]]
 
         if self.type == "bezier" and self.degree is not None:
-            cp_array = np.array(self.control_points, dtype=np.float64)
-            engine = nurbslib.PyBezierCurve(int(self.degree), cp_array, None)
-
-            pts = engine.evaluate(100, False)
+            engine = SplineModel(str(self.tag), self.control_points, int(self.degree))
+            pts = np.array(engine.get_render_data()["curve"], dtype=np.float64)
             if len(pts.shape) == 2 and pts.shape[0] in (2, 3) and pts.shape[1] > 3:
                 pts = pts.T
 

@@ -8,7 +8,7 @@ requires-python = ">=3.14"
 dependencies = [
     "gmsh>=4.15.0",
     "ipython>=9.10.0",
-    "nurbslib",
+    "ferrispline",
     "panda3d>=1.10.16",
 ]
 
@@ -16,7 +16,7 @@ dependencies = [
 package = true
 
 [tool.uv.sources]
-nurbslib = { path = "ferrispline/nurbslib" }
+ferrispline = { path = "ferrispline/python" }
 
 [build-system]
 requires = ["hatchling"]
