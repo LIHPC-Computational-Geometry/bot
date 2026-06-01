@@ -23,7 +23,7 @@ class TestSplineModel(unittest.TestCase):
 
         # 2. Mock configuration to simulate the ferrispline engine
         mock_model_instance = MagicMock()
-        mock_model_instance.create_spline.return_value = "curve-1"
+        mock_model_instance.create_bezier.return_value = "curve-1"
         mock_model_instance.evaluate.return_value = np.array(control_points)
         mock_nurbslib.PyModel.return_value = mock_model_instance
 
@@ -37,7 +37,7 @@ class TestSplineModel(unittest.TestCase):
 
         # Ensure the Rust model was called with the correct arguments
         mock_nurbslib.PyModel.assert_called_once()
-        args, kwargs = mock_model_instance.create_spline.call_args
+        args, kwargs = mock_model_instance.create_bezier.call_args
         self.assertEqual(args[0], degree)
         np.testing.assert_array_equal(args[1], np.array(control_points))
         self.assertIsNone(args[2])
@@ -106,7 +106,7 @@ class TestSplineModel(unittest.TestCase):
 
         # Mock configuration
         mock_model_instance = MagicMock()
-        mock_model_instance.create_spline.return_value = "curve-42"
+        mock_model_instance.create_bezier.return_value = "curve-42"
         mock_model_instance.evaluate.return_value = np.array(mock_curve_eval)
         mock_nurbslib.PyModel.return_value = mock_model_instance
 
