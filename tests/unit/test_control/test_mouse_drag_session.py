@@ -35,7 +35,7 @@ class _FakeScene:
         """Called by _start_cp_drag."""
         self.axis_guide_shown = True
 
-    def preview_control_point(self, curve_tag, cp_index, world_pos):
+    def preview_evaluate(self, curve_tag, cp_index, world_pos):
         """Called by _update_cp_drag."""
         self.previewed_cp = (curve_tag, cp_index, world_pos)
 

@@ -15,6 +15,9 @@ import unittest
 
 import pytest
 
+from bot.core.cad import CADModel
+from bot.viewer.viewer import Viewer
+
 
 def _has_display() -> bool:
     """Return True if a graphical display is available."""
@@ -30,11 +33,9 @@ class TestViewerSubprocessLifecycle(unittest.TestCase):
     """Start and stop the real Panda3D subprocess."""
 
     def _start_viewer(self, model=None):
-        from bot.viewer.viewer import Viewer
-
         v = Viewer()
         if model:
-            v.connect(model)
+            v.connect_models(model)
         v.run()
         return v
 
@@ -61,22 +62,18 @@ class TestViewerSubprocessLifecycle(unittest.TestCase):
         v.stop()
         self.assertIsNone(v._conn)
 
-    def test_stop_deregisters_observer(self):
-        from bot.core.cad import Model as CADModel
-
+    def test_stop_disconnects_viewable(self):
         model = CADModel()
         model.open("data/profil_1.geo")
         try:
             v = self._start_viewer(model)
             time.sleep(1.0)
             v.stop()
-            self.assertNotIn(v, model._observers)
+            self.assertIsNone(v._viewable)
         finally:
             model.finalize()
 
     def test_run_returns_self_for_chaining(self):
-        from bot.viewer.viewer import Viewer
-
         v = Viewer()
         result = v.run()
         try:
@@ -93,14 +90,11 @@ class TestViewerIPCWithModel(unittest.TestCase):
     """
 
     def setUp(self):
-        from bot.core.cad import Model as CADModel
-        from bot.viewer.viewer import Viewer
-
         self.model = CADModel()
         self.model.open("data/profil_1.geo")
         self.viewer = Viewer()
-        self.viewer.connect(self.model).run()
-        time.sleep(1.5)  # let the subprocess initialise and process the 'load'
+        self.viewer.connect_models(self.model).run()
+        time.sleep(1.5)  # let the subprocess initialise and process the 'add'
 
     def tearDown(self):
         self.viewer.stop()

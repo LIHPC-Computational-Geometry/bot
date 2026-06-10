@@ -1,13 +1,15 @@
 """
-Unit tests for bot.core.cad.Model.
+Unit tests for bot.core.cad.CADModel.
 
 These tests cover the parts that do NOT require a file on disk:
-observer pattern, get_render_data structure, add_point side-effects and
+observer pattern, CADAdapter delta load, add_point side-effects and
 input-validation errors on getClosestPoint / get_adjacent_curves_of_point.
 """
 
 import unittest
-from bot.core.cad import Model as CADModel
+from bot.core.cad import CADModel
+from bot.viewer.viewable import CADAdapter
+from bot.viewer.tags import CAD_NS, prefix
 
 
 class _MockObserver:
@@ -64,35 +66,37 @@ class TestObserverPattern(unittest.TestCase):
             self.assertEqual(len(obs.calls), 1)
 
 
-class TestGetRenderData(unittest.TestCase):
+class TestCADAdapterDeltaLoad(unittest.TestCase):
+    """Render data is produced by CADAdapter, not CADModel directly."""
+
     def setUp(self):
         self.model = CADModel()
 
     def tearDown(self):
         self.model.finalize()
 
-    def test_returns_dict_with_required_keys(self):
-        data = self.model.get_render_data()
+    def test_adapter_add_payload_has_required_keys(self):
+        self.model.open("data/profil_1.geo")
+        adapter = CADAdapter(self.model)
+        data = adapter.get_delta_load()
+        self.assertEqual(data["op"], "add")
+        self.assertIn("changed_curves", data)
+        self.assertIn("bounds", data)
         self.assertIn("points", data)
         self.assertIn("edges", data)
-        self.assertIn("bounds", data)
 
-    def test_points_and_edges_are_lists(self):
-        data = self.model.get_render_data()
-        self.assertIsInstance(data["points"], list)
-        self.assertIsInstance(data["edges"], list)
+    def test_changed_curves_use_namespaced_tags(self):
+        self.model.open("data/profil_1.geo")
+        adapter = CADAdapter(self.model)
+        data = adapter.get_delta_load()
+        for tag in data["changed_curves"]:
+            self.assertEqual(prefix(tag), CAD_NS)
 
     def test_bounds_has_expected_keys(self):
         self.model.open("data/profil_1.geo")
-        bounds = self.model.get_render_data()["bounds"]
+        bounds = CADAdapter(self.model).get_delta_load()["bounds"]
         for key in ("min", "max", "center", "size"):
             self.assertIn(key, bounds)
-
-    def test_bounds_are_lists_of_three_floats(self):
-        self.model.open("data/profil_1.geo")
-        bounds = self.model.get_render_data()["bounds"]
-        for key in ("min", "max", "center", "size"):
-            self.assertEqual(len(bounds[key]), 3)
 
 
 class TestAddPoint(unittest.TestCase):

@@ -1,5 +1,5 @@
 """
-Unit tests for bot.core.curve.SplineModel.
+Unit tests for bot.core.spline.SplineModel.
 
 The external Rust dependency (ferrispline) is mocked to allow testing the
 Python bridge and logic without requiring the compiled engine.
@@ -7,41 +7,30 @@ Python bridge and logic without requiring the compiled engine.
 
 import unittest
 from unittest.mock import MagicMock, patch
+
 import numpy as np
 
 from bot.core.spline import SplineModel
 
 
-class TestSplineModel(unittest.TestCase):
+class _MockObserver:
+    def __init__(self):
+        self.calls = []
+
+    def update(self, model):
+        self.calls.append(model)
+
+
+class TestSplineModelInitialization(unittest.TestCase):
     @patch("bot.core.spline.ferrispline")
-    def test_initialization_and_attributes(self, mock_nurbslib):
-        """Tests the initialization of the curve and access to its basic attributes."""
-        # 1. Data preparation
-        tag = "curve_1"
-        control_points = [[0.0, 0.0, 0.0], [5.0, 5.0, 0.0], [10.0, 0.0, 0.0]]
-        degree = 2
+    def test_empty_model_on_construction(self, mock_ferrispline):
+        model = SplineModel()
 
-        # 2. Mock configuration to simulate the ferrispline engine
-        mock_model_instance = MagicMock()
-        mock_model_instance.create_bezier.return_value = "curve-1"
-        mock_model_instance.evaluate.return_value = np.array(control_points)
-        mock_nurbslib.PyModel.return_value = mock_model_instance
+        self.assertEqual(model.curves, [])
+        mock_ferrispline.PyModel.assert_called_once()
 
-        # 3. Object creation
-        curve = SplineModel(tag, control_points, degree)
 
-        # 4. Verifications (Assertions)
-        self.assertEqual(curve.get_tag(), "curve_1")
-        self.assertEqual(curve.get_control_points(), control_points)
-        self.assertEqual(curve.get_degree(), degree)
-
-        # Ensure the Rust model was called with the correct arguments
-        mock_nurbslib.PyModel.assert_called_once()
-        args, kwargs = mock_model_instance.create_bezier.call_args
-        self.assertEqual(args[0], degree)
-        np.testing.assert_array_equal(args[1], np.array(control_points))
-        self.assertIsNone(args[2])
-
+class TestDefaultControlPoints(unittest.TestCase):
     def test_default_control_points_default_degree(self):
         """Tests that the method uses default degree 3 if not specified."""
         coords_a = [0.0, 0.0, 0.0]
@@ -94,40 +83,160 @@ class TestSplineModel(unittest.TestCase):
         self.assertEqual(len(pts), 1)
         self.assertEqual(pts[0], coords_a)
 
+
+class TestAddCurve(unittest.TestCase):
     @patch("bot.core.spline.ferrispline")
-    def test_get_render_data(self, mock_nurbslib):
-        """Tests the structure and content of the render dictionary (used by the viewer)."""
-        tag = "42"
-        control_points = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
+    def test_add_bezier_curve(self, mock_ferrispline):
+        control_points = [[0.0, 0.0, 0.0], [5.0, 5.0, 0.0], [10.0, 0.0, 0.0]]
+        degree = 2
+
+        mock_engine = MagicMock()
+        mock_engine.create_bezier.return_value = "curve-1"
+        mock_ferrispline.PyModel.return_value = mock_engine
+
+        model = SplineModel()
+        tag = model.add_curve("bezier", degree, control_points)
+
+        self.assertEqual(tag, "curve-1")
+        self.assertEqual(model.curves, ["curve-1"])
+        mock_engine.create_bezier.assert_called_once()
+        args, _ = mock_engine.create_bezier.call_args
+        self.assertEqual(args[0], degree)
+        np.testing.assert_array_equal(
+            args[1], np.array(control_points, dtype=np.float64)
+        )
+        self.assertIsNone(args[2])
+
+    @patch("bot.core.spline.ferrispline")
+    def test_add_nurbs_curve(self, mock_ferrispline):
+        control_points = [[0.0, 0.0, 0.0], [1.0, 1.0, 0.0]]
         degree = 1
 
-        # Simulated result of curve evaluation by the engine
-        mock_curve_eval = [[0.0, 0.0, 0.0], [0.5, 0.5, 0.5], [1.0, 1.0, 1.0]]
+        mock_engine = MagicMock()
+        mock_engine.create_nurbs.return_value = "curve-nurbs"
+        mock_ferrispline.PyModel.return_value = mock_engine
 
-        # Mock configuration
-        mock_model_instance = MagicMock()
-        mock_model_instance.create_bezier.return_value = "curve-42"
-        mock_model_instance.evaluate.return_value = np.array(mock_curve_eval)
-        mock_nurbslib.PyModel.return_value = mock_model_instance
+        model = SplineModel()
+        tag = model.add_curve("nurbs", degree, control_points)
 
-        # Object creation and data retrieval
-        curve = SplineModel(tag, control_points, degree)
-        data = curve.get_render_data()
+        self.assertEqual(tag, "curve-nurbs")
+        self.assertIn("curve-nurbs", model.curves)
+        mock_engine.create_nurbs.assert_called_once()
 
-        # Verification of the presence of all required keys
-        self.assertIn("tag", data)
-        self.assertIn("control_points", data)
-        self.assertIn("degree", data)
-        self.assertIn("curve", data)
+    @patch("bot.core.spline.ferrispline")
+    def test_add_curve_invalid_type_raises(self, mock_ferrispline):
+        mock_ferrispline.PyModel.return_value = MagicMock()
+        model = SplineModel()
 
-        # Verifications of values
-        self.assertEqual(data["tag"], "42")
-        self.assertEqual(data["control_points"], control_points)
-        self.assertEqual(data["degree"], degree)
-        self.assertEqual(data["curve"], mock_curve_eval)
+        with self.assertRaises(TypeError):
+            model.add_curve("bspline", 2, [[0.0, 0.0, 0.0]])
 
-        # Ensure the engine was called to generate 100 points
-        mock_model_instance.evaluate.assert_called_once_with("curve-42", 100)
+    @patch("bot.core.spline.ferrispline")
+    def test_add_curve_notifies_observers(self, mock_ferrispline):
+        mock_engine = MagicMock()
+        mock_engine.create_bezier.return_value = "curve-1"
+        mock_ferrispline.PyModel.return_value = mock_engine
+
+        model = SplineModel()
+        observer = _MockObserver()
+        model.add_observer(observer)
+        model.add_curve(
+            "bezier", 2, [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]]
+        )
+
+        self.assertEqual(len(observer.calls), 1)
+        self.assertIs(observer.calls[0], model)
+
+
+class TestCurveQueries(unittest.TestCase):
+    @patch("bot.core.spline.ferrispline")
+    def test_get_control_points_and_degree(self, mock_ferrispline):
+        control_points = [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]
+        mock_engine = MagicMock()
+        mock_engine.create_bezier.return_value = "curve-42"
+        mock_engine.get_control_points.return_value = control_points
+        mock_engine.get_degree.return_value = 1
+        mock_ferrispline.PyModel.return_value = mock_engine
+
+        model = SplineModel()
+        tag = model.add_curve("bezier", 1, control_points)
+
+        self.assertEqual(model.get_control_points(tag), control_points)
+        self.assertEqual(model.get_degree(tag), 1)
+        mock_engine.get_control_points.assert_called_once_with(tag)
+        mock_engine.get_degree.assert_called_once_with(tag)
+
+    @patch("bot.core.spline.ferrispline")
+    def test_evaluate_delegates_to_engine(self, mock_ferrispline):
+        evaluated = [[0.0, 0.0, 0.0], [0.5, 0.5, 0.5], [1.0, 1.0, 1.0]]
+        mock_engine = MagicMock()
+        mock_engine.create_bezier.return_value = "curve-42"
+        mock_engine.evaluate.return_value = evaluated
+        mock_ferrispline.PyModel.return_value = mock_engine
+
+        model = SplineModel()
+        tag = model.add_curve("bezier", 1, [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
+        result = model._evaluate(tag, 100)
+
+        self.assertEqual(result, evaluated)
+        mock_engine.evaluate.assert_called_once_with(tag, 100)
+
+
+class TestMoveControlPoint(unittest.TestCase):
+    @patch("bot.core.spline.ferrispline")
+    def test_move_control_point_updates_engine_and_notifies(self, mock_ferrispline):
+        mock_engine = MagicMock()
+        mock_engine.create_bezier.return_value = "curve-1"
+        mock_ferrispline.PyModel.return_value = mock_engine
+
+        model = SplineModel()
+        tag = model.add_curve(
+            "bezier", 2, [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]]
+        )
+        observer = _MockObserver()
+        model.add_observer(observer)
+        observer.calls.clear()
+
+        new_pt = [5.0, 5.0, 0.0]
+        model.move_control_point(tag, 1, new_pt)
+
+        mock_engine.move_control_point.assert_called_once()
+        args, _ = mock_engine.move_control_point.call_args
+        self.assertEqual(args[0], tag)
+        self.assertEqual(args[1], 1)
+        np.testing.assert_array_equal(args[2], np.array(new_pt, dtype=np.float64))
+        self.assertEqual(len(observer.calls), 1)
+
+
+class TestRemoveCurve(unittest.TestCase):
+    @patch("bot.core.spline.ferrispline")
+    def test_remove_curve_notifies_on_success(self, mock_ferrispline):
+        mock_engine = MagicMock()
+        mock_engine.delete_curve.return_value = True
+        mock_ferrispline.PyModel.return_value = mock_engine
+
+        model = SplineModel()
+        observer = _MockObserver()
+        model.add_observer(observer)
+
+        model.remove_curve("curve-1")
+
+        mock_engine.delete_curve.assert_called_once_with("curve-1")
+        self.assertEqual(len(observer.calls), 1)
+
+    @patch("bot.core.spline.ferrispline")
+    def test_remove_curve_does_not_notify_on_failure(self, mock_ferrispline):
+        mock_engine = MagicMock()
+        mock_engine.delete_curve.return_value = False
+        mock_ferrispline.PyModel.return_value = mock_engine
+
+        model = SplineModel()
+        observer = _MockObserver()
+        model.add_observer(observer)
+
+        model.remove_curve("missing")
+
+        self.assertEqual(len(observer.calls), 0)
 
 
 if __name__ == "__main__":

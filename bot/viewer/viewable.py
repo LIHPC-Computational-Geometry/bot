@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Callable, Protocol
 
-import gmsh
-
 from bot.core.cad import CADModel
 from bot.core.spline import SplineModel
 from bot.viewer.contracts import CurveDelta, ScenePayload, ViewerCommand, ViewEvent
@@ -57,7 +55,7 @@ class CADAdapter:
         self._update_callback = None
 
     def get_delta_load(self) -> ScenePayload:
-        changed_curves = self._build_all_curves()
+        changed_curves = self._build_changed_curves()
         flat_points, flat_edges = self._build_flat_topology(changed_curves)
         payload: ScenePayload = {
             "op": "add",
@@ -97,7 +95,7 @@ class CADAdapter:
             self._update_callback(
                 {
                     "op": "update",
-                    "changed_curves": self._build_all_curves(),
+                    "changed_curves": self._build_changed_curves(),
                 }
             )
 
@@ -118,35 +116,13 @@ class CADAdapter:
             return None
         return local_id
 
-    def _build_all_curves(self) -> dict[str, CurveDelta]:
+    def _build_changed_curves(self) -> dict[str, CurveDelta]:
         changed: dict[str, CurveDelta] = {}
         try:
-            node_tags, coords, _ = gmsh.model.mesh.getNodes()
-            node_id_to_coords = {
-                tag: (coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2])
-                for i, tag in enumerate(node_tags)
-            }
-
-            for entity in gmsh.model.getEntities(1):
-                gmsh_tag = entity[1]
-                _, _, node_tags_per_elem = gmsh.model.mesh.getElements(1, gmsh_tag)
-                if not node_tags_per_elem:
-                    continue
-
-                connectivity = node_tags_per_elem[0]
-                seen: dict[int, int] = {}
-                local_points: list[tuple[float, float, float]] = []
-                local_edges: list[tuple[int, int]] = []
-
-                for i in range(0, len(connectivity), 2):
-                    for node_tag in (connectivity[i], connectivity[i + 1]):
-                        if node_tag not in seen:
-                            seen[node_tag] = len(local_points)
-                            local_points.append(node_id_to_coords[node_tag])
-                    local_edges.append(
-                        (seen[connectivity[i]], seen[connectivity[i + 1]])
-                    )
-
+            for gmsh_tag, (
+                local_points,
+                local_edges,
+            ) in self._model.get_curve_discretization().items():
                 ns_tag = encode(CAD_NS, gmsh_tag)
                 changed[ns_tag] = pack_curve_delta(
                     local_points,

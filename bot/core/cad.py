@@ -305,46 +305,40 @@ class CADModel(Observable):
 
         return corners
 
-    def get_curve_discretization(self):
-        # Get mesh node tags and their coordinates
+    def get_curve_discretization(
+        self,
+    ) -> dict[int, tuple[list[tuple[float, float, float]], list[tuple[int, int]]]]:
+        """Per-curve 1D mesh: gmsh_tag -> (local_points, local_edges)."""
+        curves: dict[
+            int, tuple[list[tuple[float, float, float]], list[tuple[int, int]]]
+        ] = {}
         node_tags, coords, _ = gmsh.model.mesh.getNodes()
-        node_id_to_index = {tag: i for i, tag in enumerate(node_tags)}
-        # Get all the entities of dim 1
-        elem_types, elem_tags, elem_node_tags = gmsh.model.mesh.getElements(dim=1)
+        node_id_to_coords = {
+            tag: (coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2])
+            for i, tag in enumerate(node_tags)
+        }
 
-        # On transforme la liste plate [x,y,z,x,y,z] en liste de tuples [(x,y,z), ...]
-        points_3d = []
-        for i in range(0, len(coords), 3):
-            points_3d.append((coords[i], coords[i + 1], coords[i + 2]))
+        for entity in gmsh.model.getEntities(1):
+            gmsh_tag = entity[1]
+            _, _, node_tags_per_elem = gmsh.model.mesh.getElements(1, gmsh_tag)
+            if not node_tags_per_elem:
+                continue
 
-        # 2. Liste finale des données
-        # Structure : (index_sommet_A, index_sommet_B, tag_courbe_origine)
-        edges_with_metadata = []
+            connectivity = node_tags_per_elem[0]
+            seen: dict[int, int] = {}
+            local_points: list[tuple[float, float, float]] = []
+            local_edges: list[tuple[int, int]] = []
 
-        # 3. Parcourir chaque "Courbe" (entité de dimension 1)
-        entities = gmsh.model.getEntities(1)
+            for i in range(0, len(connectivity), 2):
+                for node_tag in (connectivity[i], connectivity[i + 1]):
+                    if node_tag not in seen:
+                        seen[node_tag] = len(local_points)
+                        local_points.append(node_id_to_coords[node_tag])
+                local_edges.append((seen[connectivity[i]], seen[connectivity[i + 1]]))
 
-        for entity in entities:
-            curve_tag = entity[1]  # C'est le Tag de la courbe CAO
+            curves[gmsh_tag] = (local_points, local_edges)
 
-            # Récupérer les éléments (segments) appartenant UNIQUEMENT à cette courbe
-            _, _, node_tags_per_elem = gmsh.model.mesh.getElements(1, curve_tag)
-
-            if len(node_tags_per_elem) > 0:
-                connectivity = node_tags_per_elem[0]
-
-                # Parcourir les nœuds par paires pour former les arêtes
-                for i in range(0, len(connectivity), 2):
-                    tag_a = connectivity[i]
-                    tag_b = connectivity[i + 1]
-
-                    # Conversion en indices (0, 1, 2...) pour Panda3D
-                    idx_a = node_id_to_index[tag_a]
-                    idx_b = node_id_to_index[tag_b]
-
-                    edges_with_metadata.append((idx_a, idx_b, curve_tag))
-
-        return points_3d, edges_with_metadata
+        return curves
 
     def _discretize_curves(self):
         self.__synchronize()
