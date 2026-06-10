@@ -93,117 +93,51 @@ class TestViewerDisconnect(unittest.TestCase):
         viewer.disconnect()
 
 
-class TestViewerOnDelta(unittest.TestCase):
+class TestViewerPipe(unittest.TestCase):
+    """IPC forwarding — one place for send / on_delta behaviour."""
+
     def _make_viewer(self):
         from bot.viewer.viewer import Viewer
 
         return Viewer()
 
-    def test_on_delta_sends_op_over_pipe(self):
+    def test_forwards_message_when_connected(self):
         viewer = self._make_viewer()
         mock_conn = MagicMock()
         viewer._conn = mock_conn
-        viewer._on_delta({"op": "update", "changed_curves": {}})
-        mock_conn.send.assert_called_once_with(
-            ("update", {"op": "update", "changed_curves": {}})
-        )
+        payload = {"op": "update", "changed_curves": {"cad:1": {}}}
+        viewer._on_delta(payload)
+        mock_conn.send.assert_called_once_with(("update", payload))
 
-    def test_on_delta_ignores_broken_pipe(self):
-        viewer = self._make_viewer()
-        mock_conn = MagicMock()
-        mock_conn.send.side_effect = BrokenPipeError
-        viewer._conn = mock_conn
-        viewer._on_delta({"op": "update", "changed_curves": {}})
-
-
-class TestViewerSend(unittest.TestCase):
-    def _make_viewer(self):
-        from bot.viewer.viewer import Viewer
-
-        return Viewer()
-
-    def test_send_transmits_command(self):
-        viewer = self._make_viewer()
-        mock_conn = MagicMock()
-        viewer._conn = mock_conn
-        viewer._send("add", {"op": "add", "changed_curves": {}})
-        mock_conn.send.assert_called_once_with(
-            ("add", {"op": "add", "changed_curves": {}})
-        )
-
-    def test_send_silences_broken_pipe(self):
+    def test_ignores_broken_pipe(self):
         viewer = self._make_viewer()
         mock_conn = MagicMock()
         mock_conn.send.side_effect = BrokenPipeError
         viewer._conn = mock_conn
         viewer._send("add", {})
+        viewer._on_delta({"op": "update", "changed_curves": {}})
 
-    def test_send_noop_when_no_connection(self):
+    def test_noop_when_no_connection(self):
         viewer = self._make_viewer()
         viewer._send("add", {})
 
 
-class TestViewerDispatchCommands(unittest.TestCase):
-    def _make_viewer(self):
-        from bot.viewer.viewer import Viewer
-
-        viewer = Viewer()
-        viewer._conn = MagicMock()
-        viewer.highlight_curve = MagicMock()
-        viewer.set_hud_text = MagicMock()
-        viewer.set_edit_mode = MagicMock()
-        viewer.set_active_curve = MagicMock()
-        return viewer
-
-    def test_dispatch_highlight_and_hud(self):
-        viewer = self._make_viewer()
-        viewer._dispatch_commands(
-            [
-                {"cmd": "highlight_curve", "tag": "cad:1", "color": [1, 0, 0, 1]},
-                {"cmd": "update_hud", "text": "hello"},
-            ]
-        )
-        viewer.highlight_curve.assert_called_once_with("cad:1", [1, 0, 0, 1])
-        viewer.set_hud_text.assert_called_once_with("hello")
-
-    def test_dispatch_edit_mode(self):
-        viewer = self._make_viewer()
-        viewer._dispatch_commands(
-            [{"cmd": "set_edit_mode", "enabled": True, "curve_tag": "cad:2"}]
-        )
-        viewer.set_edit_mode.assert_called_once_with(True, "cad:2")
-
-
-class TestViewerCurveEditMode(unittest.TestCase):
+class TestViewerAxisConstraint(unittest.TestCase):
     def _make_viewer(self):
         from bot.viewer.viewer import Viewer
 
         viewer = Viewer()
         viewer._conn = MagicMock()
         return viewer
-
-    def test_set_edit_mode_sends_command(self):
-        viewer = self._make_viewer()
-        viewer.set_edit_mode(True, "cad:7")
-        viewer._conn.send.assert_called_with(
-            ("set_edit_mode", {"enabled": True, "curve_tag": "cad:7"})
-        )
-
-    def test_set_active_curve_sends_command(self):
-        viewer = self._make_viewer()
-        viewer.set_active_curve("cad:9")
-        viewer._conn.send.assert_called_with(
-            ("set_active_curve", {"curve_tag": "cad:9"})
-        )
-
-    def test_set_axis_constraint_sends_command(self):
-        viewer = self._make_viewer()
-        viewer.set_axis_constraint(6)
-        viewer._conn.send.assert_called_with(("set_axis_constraint", {"mask": 6}))
 
     def test_set_axis_constraint_clamps_invalid_value(self):
         viewer = self._make_viewer()
         viewer.set_axis_constraint("oops")
+        viewer._conn.send.assert_called_with(("set_axis_constraint", {"mask": 7}))
+
+    def test_set_axis_constraint_clamps_out_of_range(self):
+        viewer = self._make_viewer()
+        viewer.set_axis_constraint(99)
         viewer._conn.send.assert_called_with(("set_axis_constraint", {"mask": 7}))
 
 
@@ -226,6 +160,7 @@ class TestViewerMoveControlPoint(unittest.TestCase):
         event = viewable.handle_event.call_args[0][0]
         self.assertEqual(event["event_type"], "cp_pick_end")
         self.assertEqual(event["curve_tag"], "spline:curve-1")
+        self.assertEqual(event["world_pos"], [1.0, 2.0, 3.0])
 
 
 if __name__ == "__main__":

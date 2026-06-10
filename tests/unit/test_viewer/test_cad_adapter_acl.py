@@ -1,13 +1,19 @@
 """Unit tests for CADAdapter Anti-Corruption Layer."""
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
+from bot.core.cad import CADModel
+from bot.viewer.serialize import bytes_to_point_list
 from bot.viewer.tags import encode, CAD_NS
 from bot.viewer.viewable import CADAdapter
 
+GEO_FILE = "data/profil_1.geo"
 
-class TestCADAdapterACL(unittest.TestCase):
+
+class TestCADAdapterACLEventGuards(unittest.TestCase):
+    """Tag validation and routing guards — isolated with a mock model."""
+
     def setUp(self):
         self.model = MagicMock()
         self.model.bounds = {"min": [0, 0, 0], "max": [1, 1, 1]}
@@ -33,28 +39,55 @@ class TestCADAdapterACL(unittest.TestCase):
         commands = self.adapter.handle_event(
             {"event_type": "curve_selected", "tag": tag, "curve_tag": tag}
         )
-        self.assertTrue(any(c.get("cmd") == "set_edit_mode" for c in commands))
-        self.assertTrue(
-            any(
-                c.get("curve_tag") == tag
-                for c in commands
-                if c.get("cmd") == "set_edit_mode"
-            )
+        self.assertEqual(
+            commands,
+            [
+                {"cmd": "set_edit_mode", "enabled": True, "curve_tag": tag},
+                {"cmd": "set_active_curve", "curve_tag": tag},
+                {
+                    "cmd": "update_hud",
+                    "text": f"Editing curve {tag}: drag a control point.",
+                },
+            ],
         )
 
-    @patch.object(CADAdapter, "_build_changed_curves", return_value={})
-    def test_update_emits_op_update(self, _mock_build):
-        callback = MagicMock()
-        self.adapter.bind_update(callback)
-        self.adapter.update(self.model)
-        payload = callback.call_args[0][0]
-        self.assertEqual(payload["op"], "update")
-        self.assertIn("changed_curves", payload)
 
-    @patch.object(CADAdapter, "_build_changed_curves", return_value={})
-    def test_get_delta_load_emits_op_add(self, _mock_build):
+class TestCADAdapterACLWithModel(unittest.TestCase):
+    """Delta load and observer update with a real CADModel."""
+
+    def setUp(self):
+        self.model = CADModel()
+        self.model.open(GEO_FILE)
+        self.adapter = CADAdapter(self.model)
+
+    def tearDown(self):
+        self.model.finalize()
+
+    def test_get_delta_load_emits_op_add_with_curves(self):
         payload = self.adapter.get_delta_load()
         self.assertEqual(payload["op"], "add")
+        self.assertEqual(
+            set(payload["changed_curves"].keys()),
+            {encode(CAD_NS, tag) for tag in self.model.get_curve_tags()},
+        )
+        for delta in payload["changed_curves"].values():
+            self.assertGreater(delta["vertex_count"], 0)
+            pts = bytes_to_point_list(
+                delta["geometry"]["curve_vertices"], delta["vertex_count"]
+            )
+            self.assertEqual(len(pts), delta["vertex_count"])
+
+    def test_update_emits_op_update_with_changed_curves(self):
+        callback = MagicMock()
+        self.adapter.bind_update(callback)
+        self.model.add_point([50.0, 50.0, 0.0])
+        self.assertEqual(callback.call_count, 1)
+        payload = callback.call_args[0][0]
+        self.assertEqual(payload["op"], "update")
+        self.assertEqual(
+            set(payload["changed_curves"].keys()),
+            {encode(CAD_NS, tag) for tag in self.model.get_curve_tags()},
+        )
 
 
 if __name__ == "__main__":

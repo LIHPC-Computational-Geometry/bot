@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import MagicMock
 
 from bot.core.cad import CADModel
+from bot.viewer.tags import CAD_NS, encode, prefix
 from bot.viewer.viewer import Viewer
 
 GEO_FILE = "data/profil_1.geo"
@@ -22,6 +23,10 @@ def _make_spied_viewer() -> tuple[Viewer, MagicMock]:
     spy = MagicMock()
     viewer._conn = spy
     return viewer, spy
+
+
+def _expected_curve_tags(model: CADModel) -> set[str]:
+    return {encode(CAD_NS, tag) for tag in model.get_curve_tags()}
 
 
 class TestViewerReceivesLoad(unittest.TestCase):
@@ -41,21 +46,15 @@ class TestViewerReceivesLoad(unittest.TestCase):
         cmd, data = spy.send.call_args[0][0]
         self.assertEqual(cmd, "add")
         self.assertEqual(data["op"], "add")
-
-    def test_add_payload_contains_changed_curves_and_bounds(self):
-        viewer, spy = _make_spied_viewer()
-        viewer.connect_models(self.model)
-        _, data = spy.send.call_args[0][0]
-        self.assertIn("changed_curves", data)
-        self.assertIn("bounds", data)
-        self.assertGreater(len(data["changed_curves"]), 0)
-
-    def test_add_payload_contains_flat_topology(self):
-        viewer, spy = _make_spied_viewer()
-        viewer.connect_models(self.model)
-        _, data = spy.send.call_args[0][0]
+        self.assertEqual(
+            set(data["changed_curves"].keys()), _expected_curve_tags(self.model)
+        )
+        self.assertEqual(data["bounds"], self.model.bounds)
+        for tag in data["changed_curves"]:
+            self.assertEqual(prefix(tag), CAD_NS)
         self.assertIn("points", data)
         self.assertIn("edges", data)
+        self.assertGreater(len(data["edges"]), 0)
 
 
 class TestViewerReceivesUpdate(unittest.TestCase):
@@ -77,11 +76,9 @@ class TestViewerReceivesUpdate(unittest.TestCase):
         cmd, data = self.spy.send.call_args[0][0]
         self.assertEqual(cmd, "update")
         self.assertEqual(data["op"], "update")
-
-    def test_update_payload_has_changed_curves(self):
-        self.model.add_point([50.0, 50.0, 0.0])
-        _, data = self.spy.send.call_args[0][0]
-        self.assertIn("changed_curves", data)
+        self.assertEqual(
+            set(data["changed_curves"].keys()), _expected_curve_tags(self.model)
+        )
 
     def test_multiple_mutations_each_trigger_update(self):
         for x in [10.0, 20.0, 30.0]:
@@ -91,6 +88,9 @@ class TestViewerReceivesUpdate(unittest.TestCase):
             cmd, data = c[0][0]
             self.assertEqual(cmd, "update")
             self.assertEqual(data["op"], "update")
+            self.assertEqual(
+                set(data["changed_curves"].keys()), _expected_curve_tags(self.model)
+            )
 
 
 class TestMultipleViewers(unittest.TestCase):
