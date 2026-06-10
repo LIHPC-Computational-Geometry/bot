@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from bot.core.spline import SplineModel
+from bot.core.spline import SplineModel, BEZIER_TYP, NURBS_TYP
 
 
 class _MockObserver:
@@ -95,7 +95,7 @@ class TestAddCurve(unittest.TestCase):
         mock_ferrispline.PyModel.return_value = mock_engine
 
         model = SplineModel()
-        tag = model.add_curve("bezier", degree, control_points)
+        tag = model.add_curve(BEZIER_TYP, degree, control_points)
 
         self.assertEqual(tag, "curve-1")
         self.assertEqual(model.curves, ["curve-1"])
@@ -117,7 +117,7 @@ class TestAddCurve(unittest.TestCase):
         mock_ferrispline.PyModel.return_value = mock_engine
 
         model = SplineModel()
-        tag = model.add_curve("nurbs", degree, control_points)
+        tag = model.add_curve(NURBS_TYP, degree, control_points)
 
         self.assertEqual(tag, "curve-nurbs")
         self.assertIn("curve-nurbs", model.curves)
@@ -129,7 +129,7 @@ class TestAddCurve(unittest.TestCase):
         model = SplineModel()
 
         with self.assertRaises(TypeError):
-            model.add_curve("bspline", 2, [[0.0, 0.0, 0.0]])
+            model.add_curve("invalid", 2, [[0.0, 0.0, 0.0]])
 
     @patch("bot.core.spline.ferrispline")
     def test_add_curve_notifies_observers(self, mock_ferrispline):
@@ -141,7 +141,7 @@ class TestAddCurve(unittest.TestCase):
         observer = _MockObserver()
         model.add_observer(observer)
         model.add_curve(
-            "bezier", 2, [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]]
+            BEZIER_TYP, 2, [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]]
         )
 
         self.assertEqual(len(observer.calls), 1)
@@ -159,7 +159,7 @@ class TestCurveQueries(unittest.TestCase):
         mock_ferrispline.PyModel.return_value = mock_engine
 
         model = SplineModel()
-        tag = model.add_curve("bezier", 1, control_points)
+        tag = model.add_curve(BEZIER_TYP, 1, control_points)
 
         self.assertEqual(model.get_control_points(tag), control_points)
         self.assertEqual(model.get_degree(tag), 1)
@@ -175,7 +175,7 @@ class TestCurveQueries(unittest.TestCase):
         mock_ferrispline.PyModel.return_value = mock_engine
 
         model = SplineModel()
-        tag = model.add_curve("bezier", 1, [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
+        tag = model.add_curve(BEZIER_TYP, 1, [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
         result = model._evaluate(tag, 100)
 
         self.assertEqual(result, evaluated)
@@ -191,7 +191,7 @@ class TestMoveControlPoint(unittest.TestCase):
 
         model = SplineModel()
         tag = model.add_curve(
-            "bezier", 2, [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]]
+            BEZIER_TYP, 2, [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]]
         )
         observer = _MockObserver()
         model.add_observer(observer)

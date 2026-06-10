@@ -14,7 +14,7 @@ from panda3d.core import (
     NodePath,
 )
 import numpy as np
-from bot.core.spline import SplineModel
+from bot.core.spline import SplineModel, BEZIER_TYP, NURBS_TYP
 
 MASK_CURVE_PICK = BitMask32.bit(1)
 MASK_CP_PICK = BitMask32.bit(2)
@@ -54,14 +54,14 @@ class CurveApp:
         self.curve_pick_radius: float = 0.2
         self.cp_pick_radius: float = 0.4
 
-        if self.type in ("bezier", "bspline"):
+        if self.type in (BEZIER_TYP, NURBS_TYP):
             self.control_points = curve_data.get("control_points", [])
             self.cp_color = [
                 [0.5, 0.5, 0.5, 1.0] for _ in range(len(self.control_points))
             ]
             self.degree = curve_data.get("degree")
 
-        if self.type == "bspline":
+        if self.type == NURBS_TYP:
             self.knots = curve_data.get("knots")
 
     # =========================================================================
@@ -250,7 +250,7 @@ class CurveApp:
 
         self.control_points[cp_index] = [new_pos[0], new_pos[1], new_pos[2]]
 
-        if self.type == "bezier" and self.degree is not None:
+        if self.type == BEZIER_TYP and self.degree is not None:
             pts = SplineModel.preview_evaluate(
                 self.type, self.degree, np.array(self.control_points, dtype=np.float64)
             )

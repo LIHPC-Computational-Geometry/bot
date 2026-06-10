@@ -5,6 +5,9 @@ import ferrispline
 
 from bot.core.observable import Observable
 
+BEZIER_TYP = "bezier"
+NURBS_TYP = "nurbs"
+
 
 class SplineModel(Observable):
     """
@@ -39,14 +42,14 @@ class SplineModel(Observable):
         weights: list[float] = None,
         knots: list[float] = None,
     ) -> str:
-        if type == "bezier":
+        if type == BEZIER_TYP:
             self._notify_observers()
             tag = self._model.create_bezier(
                 degree, np.array(control_points, dtype=np.float64), None
             )
             self.curves.append(tag)
             return tag
-        elif type == "nurbs":
+        elif type == NURBS_TYP:
             self._notify_observers()
             tag = self._model.create_nurbs(
                 degree, np.array(control_points, dtype=np.float64), None, None
@@ -54,7 +57,7 @@ class SplineModel(Observable):
             self.curves.append(tag)
             return tag
         else:
-            raise "Error: Invalid curve type"
+            raise TypeError("Invalid curve type")
 
     def remove_curve(self, tag: str):
         if self._model.delete_curve(tag):

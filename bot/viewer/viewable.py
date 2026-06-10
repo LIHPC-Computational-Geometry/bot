@@ -6,7 +6,7 @@ import logging
 from typing import Callable, Protocol
 
 from bot.core.cad import CADModel
-from bot.core.spline import SplineModel
+from bot.core.spline import SplineModel, BEZIER_TYP
 from bot.viewer.contracts import CurveDelta, ScenePayload, ViewerCommand, ViewEvent
 from bot.viewer.serialize import (
     bytes_to_point_list,
@@ -295,7 +295,7 @@ class SplineAdapter:
             edges = [(i, i + 1) for i in range(len(curve_points) - 1)]
             return pack_curve_delta(
                 curve_points,
-                curve_type="bezier",
+                curve_type=BEZIER_TYP,
                 control_points=control_points,
                 degree=degree,
                 edges=edges,

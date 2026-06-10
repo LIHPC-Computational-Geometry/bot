@@ -9,6 +9,8 @@ try:
 except ImportError:
     from typing_extensions import NotRequired  # type: ignore[attr-defined]
 
+from bot.core.spline import BEZIER_TYP, NURBS_TYP
+
 
 class CurveGeometry(TypedDict):
     """Binary geometry channels for a single curve."""
@@ -20,7 +22,7 @@ class CurveGeometry(TypedDict):
 class CurveDelta(TypedDict):
     """Per-curve render delta sent over the IPC pipe."""
 
-    type: Literal["linear", "bezier", "bspline"]
+    type: Literal["linear", BEZIER_TYP, NURBS_TYP]
     geometry: CurveGeometry
     vertex_count: int
     edges: list[tuple[int, int]] | None
