@@ -26,7 +26,7 @@ class CurveApp:
     """
 
     def __init__(self, tag: str, curve_data: Dict):
-        self.tag: int = int(tag)
+        self.tag: str = str(tag)
         self.edges: List = curve_data["edges"]
         self.points: List = curve_data["points"]
         self.type: str = curve_data["type"]
@@ -244,15 +244,16 @@ class CurveApp:
                 cnp.node().setIntoCollideMask(current_mask)
                 cnp.setCollideMask(current_mask)
 
-    def preview_control_point(self, cp_index: int, new_pos: List[float]):
+    def preview_evaluate(self, cp_index: int, new_pos: List[float]):
         if not self.control_points or not (0 <= cp_index < len(self.control_points)):
             return
 
         self.control_points[cp_index] = [new_pos[0], new_pos[1], new_pos[2]]
 
         if self.type == "bezier" and self.degree is not None:
-            engine = SplineModel(str(self.tag), self.control_points, int(self.degree))
-            pts = np.array(engine.get_render_data()["curve"], dtype=np.float64)
+            pts = SplineModel.preview_evaluate(
+                self.type, self.degree, np.array(self.control_points, dtype=np.float64)
+            )
             if len(pts.shape) == 2 and pts.shape[0] in (2, 3) and pts.shape[1] > 3:
                 pts = pts.T
 
@@ -271,4 +272,24 @@ class CurveApp:
 
         if self.node_path is not None:
             self.attach_collision_node()
+            self.rebuild_cp_collision()
+
+    def apply_geometry_bytes(self, buf: bytes, vertex_count: int) -> None:
+        """Update curve polyline vertices from a float32 byte buffer."""
+        arr = np.frombuffer(buf, dtype=np.float32, count=vertex_count * 3)
+        self.points = arr.reshape(vertex_count, 3).tolist()
+        self.edges = [(i, i + 1) for i in range(vertex_count - 1)]
+        if self.curve_render_node is not None:
+            self._draw_curve()
+        if self.node_path is not None:
+            self.attach_collision_node()
+
+    def apply_control_vertices_bytes(self, buf: bytes, cp_count: int) -> None:
+        """Update control point positions from a float32 byte buffer."""
+        if self.control_points is None:
+            return
+        arr = np.frombuffer(buf, dtype=np.float32, count=cp_count * 3)
+        self.control_points = arr.reshape(cp_count, 3).tolist()
+        if self.cp_render_node is not None:
+            self._draw_control_points(self.cp_render_node)
             self.rebuild_cp_collision()

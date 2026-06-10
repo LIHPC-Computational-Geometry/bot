@@ -8,6 +8,7 @@ from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import TextNode
 
 from bot.view.scene import Scene
+from bot.viewer.serialize import payload_to_geom_data
 from bot.control.camera import CameraController
 from bot.control.mouse import MouseHandler
 from bot.control.keyboard import KeyboardHandler
@@ -37,7 +38,7 @@ class ViewerApp(ShowBase):
             config_filename: Path (relative to the project root) of the TOML
                              config file.
             cmd_queue:       Thread-safe queue fed by the pipe-reader thread.
-                             Commands are ``('load'|'update'|'reload_config', data)``.
+                             Commands are ``('add'|'update'|'delete'|..., data)``.
             on_event_cb:     Callable ``(event_type, data)`` used to send events
                              (e.g. picking) back to the parent process.
         """
@@ -90,7 +91,7 @@ class ViewerApp(ShowBase):
         """
         Per-frame task: drain the command queue and dispatch each command.
 
-        Supported commands: ``load``, ``update``, ``reload_config``.
+        Supported commands: ``add``, ``update``, ``delete``, ``reload_config``.
 
         Returns:
             task.cont to keep the task alive.
@@ -98,10 +99,14 @@ class ViewerApp(ShowBase):
         while not self._cmd_queue.empty():
             try:
                 cmd, data = self._cmd_queue.get_nowait()
-                if cmd == "load":
+                if cmd == "add":
                     self.load_scene(data)
                 elif cmd == "update":
                     self.update_scene(data)
+                elif cmd == "delete":
+                    self.delete_scene(data)
+                elif cmd == "load":
+                    self.load_scene(data)
                 elif cmd == "reload_config":
                     self._config = data
                     if self._scene:
@@ -151,10 +156,15 @@ class ViewerApp(ShowBase):
     def _on_axis_constraint_cmd(self, mask: int):
         self._set_axis_constraint(mask)
 
-    def load_scene(self, geom_data: dict):
-        """Load (or reload) the scene from geom_data."""
+    def load_scene(self, payload: dict):
+        """Load (or reload) the scene from an add payload or legacy geom_data."""
         if self._scene is not None:
             self._scene.clear()
+
+        if isinstance(payload, dict) and payload.get("op") == "add":
+            geom_data = payload_to_geom_data(payload)
+        else:
+            geom_data = payload
 
         self._scene = Scene(self, geom_data, self._scene_cfg())
         self._scene.set_axis_constraint(self.axis_constraint_mask)
@@ -168,9 +178,26 @@ class ViewerApp(ShowBase):
 
         self._camera_controller.recenter()
 
-    def update_scene(self, geom_data: dict):
-        """Update geometry without recreating the scene."""
+    def update_scene(self, payload: dict):
+        """Apply an update payload or rebuild from legacy geom_data."""
         if self._scene is None:
-            self.load_scene(geom_data)
-        else:
-            self._scene.rebuild(geom_data)
+            self.load_scene(payload)
+            return
+
+        if isinstance(payload, dict) and payload.get("op") == "update":
+            self._scene.apply_patch(payload)
+            return
+
+        if isinstance(payload, dict) and "changed_curves" in payload:
+            self._scene.apply_patch(payload)  # type: ignore[arg-type]
+            return
+
+        self._scene.rebuild(payload)
+
+    def delete_scene(self, payload: dict):
+        """Remove curves listed in a delete payload."""
+        if self._scene is None:
+            return
+        tags = payload.get("deleted_curves", [])
+        if tags:
+            self._scene.remove_curves([str(t) for t in tags])

@@ -2,43 +2,26 @@ import gmsh
 import numbers
 from pathlib import Path
 
+from bot.core.observable import Observable
+
 """"global value to indicate how to round floating numbers"""
 nb_digit_rounding = 4
 
 
-class Model:
+class CADModel(Observable):
     """
     The geometric model provides simple and basic function to load geometric files and to query a geometric model
     based on the OpenCascade technology. To do so, we totally rely on the gmsh library.
     """
 
     def __init__(self):
+        super().__init__()
         self.initialize()
-        self._observers = []
         self.bounds = {"min": [0, 0, 0], "max": [0, 0, 0]}
-        self.curves = {}
-
-    def set_curve(self, tag: int, curve_object):
-        """Stocke une courbe modifiée (ex: BezierCurve) et notifie l'interface."""
-        self.curves[tag] = curve_object
-        self._notify_observers()
-
-    def get_curve(self, tag: int):
-        return self.curves.get(tag)
-
-    def add_observer(self, observer):
-        self._observers.append(observer)
-
-    def remove_observer(self, observer):
-        self._observers.remove(observer)
-
-    def _notify_observers(self):
-        for observer in self._observers:
-            observer.update(self)
 
     def initialize(self):
         """
-        core.cad.Model.initialize()
+        core.cad.CADModel.initialize()
 
         initialize the gmsh context useful for the geometric model. This operation must be called before any
         other operations.
@@ -53,7 +36,7 @@ class Model:
 
     def finalize(self):
         """
-        core.cad.Model.finalize()
+        core.cad.CADModel.finalize()
         This operation must be called at the end of the program to finalize the gmsh context.
 
         If this operation is called, it is impossible to use this obkject anymore.
@@ -62,7 +45,7 @@ class Model:
 
     def open(self, filename):
         """
-        core.cad.Model.open(filename)
+        core.cad.CADModel.open(filename)
 
         open the model contained in the file named `filename`, which is the path to
         the file to import. The model is clear beforehand
@@ -101,77 +84,6 @@ class Model:
             "size": [max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs)],
         }
 
-    def get_render_data(self) -> dict:
-        """Return all display data needed by the viewer (thread-safe, no gmsh dependency)."""
-        curves_data = {}
-        flat_points = []
-        flat_edges = []
-
-        node_tags, coords, _ = gmsh.model.mesh.getNodes()
-        node_id_to_coords = {
-            tag: (coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2])
-            for i, tag in enumerate(node_tags)
-        }
-
-        for entity in gmsh.model.getEntities(1):
-            tag = entity[1]
-            _, _, node_tags_per_elem = gmsh.model.mesh.getElements(1, tag)
-
-            if not node_tags_per_elem:
-                continue
-
-            connectivity = node_tags_per_elem[0]
-
-            # Index local à cette courbe
-            seen = {}
-            local_points = []
-            local_edges = []
-
-            for i in range(0, len(connectivity), 2):
-                for node_tag in (connectivity[i], connectivity[i + 1]):
-                    if node_tag not in seen:
-                        seen[node_tag] = len(local_points)
-                        local_points.append(node_id_to_coords[node_tag])
-                local_edges.append((seen[connectivity[i]], seen[connectivity[i + 1]]))
-
-            curve_entry = {
-                "points": local_points,
-                "edges": local_edges,
-                "type": "linear",
-            }
-
-            # Surcharge si courbe paramétrique connue
-            if tag in self.curves:
-                custom = self.curves[tag]
-                render = custom.get_render_data()
-                curve_entry.update(
-                    {
-                        "type": "bezier",
-                        "degree": render["degree"],
-                        "control_points": render["control_points"],
-                        "cp_edges": [
-                            (i, i + 1) for i in range(len(render["control_points"]) - 1)
-                        ],
-                        "points": render["curve"],  # écrase les pts gmsh
-                        "edges": [(i, i + 1) for i in range(len(render["curve"]) - 1)],
-                    }
-                )
-
-            curves_data[str(tag)] = curve_entry
-
-            # Backward-compatible flattened payload expected by existing tests/viewers.
-            offset = len(flat_points)
-            flat_points.extend(curve_entry["points"])
-            for idx_a, idx_b in curve_entry["edges"]:
-                flat_edges.append((offset + idx_a, offset + idx_b, int(tag)))
-
-        return {
-            "points": flat_points,
-            "edges": flat_edges,
-            "curves": curves_data,
-            "bounds": dict(self.bounds),
-        }
-
     def add_point(self, coords: list, mesh_size: float = 1.0) -> int:
         """
         Add a free point to the model at position coords = [x, y, z].
@@ -188,7 +100,7 @@ class Model:
 
     def __synchronize(self):
         """
-        core.cad.Model.synchronize()
+        core.cad.CADModel.synchronize()
 
          This operation must be invocated after applying geometric operations to be sure to have a consistent state.
          We advise to call this method before starting the meshing stage.
@@ -199,7 +111,7 @@ class Model:
         """
         Private method that returns the tags, i.e. the ids, of the cells of dimension dim.
         This operation is private and must not be called directly outside the scope of public operations of
-        cad.Model
+        cad.CADModel
 
         Args:
         dim (int): An int included in [0,3].
@@ -221,7 +133,7 @@ class Model:
 
     def get_point_tags(self):
         """
-        core.cad.Model.get_point_tags(dim)
+        core.cad.CADModel.get_point_tags(dim)
 
         returns the tags of all the points
         """
@@ -229,15 +141,19 @@ class Model:
 
     def get_curve_tags(self):
         """
-        core.cad.Model.get_curve_tags(dim)
+        core.cad.CADModel.get_curve_tags(dim)
 
         return the tags of all the curves
         """
         return self.__get_cell_tags(1)
 
+    def has_curve(self, curve_tag: int) -> bool:
+        """Return whether a 1D entity with the given gmsh tag exists."""
+        return curve_tag in self.get_curve_tags()
+
     def get_surface_tags(self):
         """
-        core.cad.Model.get_surface_tags(dim)
+        core.cad.CADModel.get_surface_tags(dim)
 
         return the tags of all the surfaces
         """
@@ -245,7 +161,7 @@ class Model:
 
     def getClosestPoint(self, dim, tag, coord):
         """
-        core.cad.Model.getClosestPoint(dim, tag, coord)
+        core.cad.CADModel.getClosestPoint(dim, tag, coord)
 
         Get the points `closestCoord` on the entity of dimension `dim` (1 or 2) and
         tag `tag` to the points `coord`, by orthogonal projection. `coord` is given
@@ -282,7 +198,7 @@ class Model:
 
     def get_end_points(self, curve_tag):
         """
-        core.cad.Model.get_end_points(curve_tag)
+        core.cad.CADModel.get_end_points(curve_tag)
 
         Get the tags of the end points of the curve of id `curve_tag `
         Return `closestCoord`, `parametricCoord`.
@@ -316,7 +232,7 @@ class Model:
 
         This function accesses the Gmsh framework to extract a list of curves
         that define the boundary of a specified face. It utilizes the
-        get_curve_loops method from the occ Model. Only the primary set of
+        get_curve_loops method from the occ CADModel. Only the primary set of
         curves is returned from the nested output.
 
         :param face_tag: The identifier tag of the target face in the Gmsh model.
@@ -461,31 +377,3 @@ class Model:
             surfaces.append(faces)
 
         return node_coords_3d, surfaces
-
-    def update_control_point(
-        self, tag: int, cp_index: int, new_pt: list[float], notify: bool = True
-    ):
-        """Met à jour un point de contrôle d'une courbe et rafraîchit l'affichage."""
-        if tag in self.curves:
-            curve = self.curves[tag]
-
-            cps = curve.get_control_points()
-
-            if 0 <= cp_index < len(cps):
-                cps[cp_index] = new_pt
-
-                if hasattr(curve, "set_control_points"):
-                    curve.set_control_points(cps)
-                else:
-                    degree = curve.get_degree()
-                    new_curve = type(curve)(str(tag), cps, degree)
-                    self.curves[tag] = new_curve
-
-                if notify:
-                    self._notify_observers()
-            else:
-                print(
-                    f"Erreur : L'index {cp_index} n'existe pas. La courbe a {len(cps)} points de contrôle."
-                )
-        else:
-            print(f"Erreur : La courbe {tag} n'est pas une courbe personnalisée.")

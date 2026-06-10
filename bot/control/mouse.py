@@ -74,7 +74,7 @@ class MouseHandler:
                 )
                 self.base._scene.hide_axis_guide()
 
-                curve = self.base._scene.curves.get(int(self.drag_curve_tag))
+                curve = self.base._scene.curves.get(str(self.drag_curve_tag))
                 if curve is not None:
                     curve.attach_collision_node()
                     curve.rebuild_cp_collision()
@@ -181,8 +181,8 @@ class MouseHandler:
         self.drag_last_valid_world_pos = list(world_pos)
 
         if getattr(self.base, "_scene", None) is not None:
-            self.base._scene.preview_control_point(
-                int(self.drag_curve_tag), self.drag_cp_index, world_pos
+            self.base._scene.preview_evaluate(
+                str(self.drag_curve_tag), self.drag_cp_index, world_pos
             )
             self.base._scene.update_axis_guide(
                 world_pos, self.constraints.drag_active_mask
