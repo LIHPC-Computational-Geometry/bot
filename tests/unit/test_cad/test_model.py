@@ -9,6 +9,7 @@ import unittest
 
 from bot.core.cad import CADModel
 from bot.viewer.tags import CAD_NS, encode, prefix
+from bot.viewer.contracts import SceneUpdateOp
 from bot.viewer.viewable import CADAdapter
 
 
@@ -73,7 +74,7 @@ class TestCADAdapterDeltaLoad(unittest.TestCase):
     def test_adapter_add_payload_has_required_keys(self):
         adapter = CADAdapter(self.model)
         data = adapter.get_delta_load()
-        self.assertEqual(data["op"], "add")
+        self.assertEqual(data["op"], SceneUpdateOp.ADD)
         self.assertIn("changed_curves", data)
         self.assertIn("bounds", data)
         self.assertIn("points", data)

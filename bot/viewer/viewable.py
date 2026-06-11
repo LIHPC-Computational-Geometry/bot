@@ -12,7 +12,15 @@ from typing import Callable, Protocol
 
 from bot.core.cad import CADModel
 from bot.core.spline import SplineModel, BEZIER_TYP
-from bot.viewer.contracts import CurveDelta, ScenePayload, ViewerCommand, ViewEvent
+from bot.viewer.contracts import (
+    CurveDelta,
+    ScenePayload,
+    SceneUpdateOp,
+    ViewerCommand,
+    ViewerCommandType,
+    ViewEvent,
+    ViewEventType,
+)
 from bot.viewer.serialize import (
     bytes_to_point_list,
     flatten_points_to_bytes,
@@ -78,7 +86,7 @@ class CADAdapter:
         changed_curves = self.__build_changed_curves()
         flat_points, flat_edges = self.__build_flat_topology(changed_curves)
         payload: ScenePayload = {
-            "op": "add",
+            "op": SceneUpdateOp.ADD,
             "changed_curves": changed_curves,
             "bounds": dict(self._model.bounds),
         }
@@ -96,13 +104,13 @@ class CADAdapter:
         tag = event.get("tag") or event.get("curve_tag")
 
         match event_type:
-            case "hover":
+            case ViewEventType.HOVER:
                 return self.__handle_hover(tag)
-            case "curve_selected":
+            case ViewEventType.CURVE_SELECTED:
                 if tag is None or self.__resolve_cad_tag_str(str(tag)) is None:
                     return []
                 return self.__handle_curve_selected(str(tag))
-            case "pick" if event.get("world_pos") is None:
+            case ViewEventType.PICK if event.get("world_pos") is None:
                 try:
                     world_pos = event["world_pos"]
                     self._model.add_point(list(world_pos))
@@ -117,7 +125,7 @@ class CADAdapter:
         if self._update_callback is not None:
             self._update_callback(
                 {
-                    "op": "update",
+                    "op": SceneUpdateOp.UPDATE,
                     "changed_curves": self.__build_changed_curves(),
                 }
             )
@@ -185,7 +193,7 @@ class CADAdapter:
             if self._last_hovered and self._last_hovered != tag_str:
                 commands.append(
                     {
-                        "cmd": "highlight_curve",
+                        "cmd": ViewerCommandType.HIGHLIGHT_CURVE,
                         "tag": self._last_hovered,
                         "color": [1, 1, 1, 1],
                     }
@@ -208,8 +216,12 @@ class CADAdapter:
 
             commands.extend(
                 [
-                    {"cmd": "update_hud", "text": info_text},
-                    {"cmd": "highlight_curve", "tag": tag_str, "color": [1, 0.5, 0, 1]},
+                    {"cmd": ViewerCommandType.UPDATE_HUD, "text": info_text},
+                    {
+                        "cmd": ViewerCommandType.HIGHLIGHT_CURVE,
+                        "tag": tag_str,
+                        "color": [1, 0.5, 0, 1],
+                    },
                 ]
             )
             self._last_hovered = tag_str
@@ -217,14 +229,14 @@ class CADAdapter:
             if self._last_hovered:
                 commands.append(
                     {
-                        "cmd": "highlight_curve",
+                        "cmd": ViewerCommandType.HIGHLIGHT_CURVE,
                         "tag": self._last_hovered,
                         "color": [1, 1, 1, 1],
                     }
                 )
                 commands.append(
                     {
-                        "cmd": "update_hud",
+                        "cmd": ViewerCommandType.UPDATE_HUD,
                         "text": "Ready. Hover or click on curves.",
                     }
                 )
@@ -234,10 +246,14 @@ class CADAdapter:
     def __handle_curve_selected(self, tag: str) -> list[ViewerCommand]:
         """Enter edit mode for the selected CAD curve."""
         return [
-            {"cmd": "set_edit_mode", "enabled": True, "curve_tag": tag},
-            {"cmd": "set_active_curve", "curve_tag": tag},
             {
-                "cmd": "update_hud",
+                "cmd": ViewerCommandType.SET_EDIT_MODE,
+                "enabled": True,
+                "curve_tag": tag,
+            },
+            {"cmd": ViewerCommandType.SET_ACTIVE_CURVE, "curve_tag": tag},
+            {
+                "cmd": ViewerCommandType.UPDATE_HUD,
                 "text": f"Editing curve {tag}: drag a control point.",
             },
         ]
@@ -268,7 +284,7 @@ class SplineAdapter:
     def get_delta_load(self) -> ScenePayload:
         """Build the initial add payload with all spline curves."""
         return {
-            "op": "add",
+            "op": SceneUpdateOp.ADD,
             "changed_curves": self.__build_all_spline_curves(),
         }
 
@@ -282,9 +298,9 @@ class SplineAdapter:
         ns_tag = encode(SPLINE_NS, local_id)
 
         match event_type:
-            case "curve_selected":
+            case ViewEventType.CURVE_SELECTED:
                 return self.__handle_curve_selected(ns_tag)
-            case "cp_pick_end":
+            case ViewEventType.CP_PICK_END:
                 return self.__handle_cp_pick_end(event, local_id)
             case _:
                 return []
@@ -294,7 +310,7 @@ class SplineAdapter:
         if self._update_callback is not None:
             self._update_callback(
                 {
-                    "op": "update",
+                    "op": SceneUpdateOp.UPDATE,
                     "changed_curves": self.__build_all_spline_curves(),
                 }
             )
@@ -345,10 +361,14 @@ class SplineAdapter:
     def __handle_curve_selected(self, ns_tag: str) -> list[ViewerCommand]:
         """Enter edit mode for the selected spline curve."""
         return [
-            {"cmd": "set_edit_mode", "enabled": True, "curve_tag": ns_tag},
-            {"cmd": "set_active_curve", "curve_tag": ns_tag},
             {
-                "cmd": "update_hud",
+                "cmd": ViewerCommandType.SET_EDIT_MODE,
+                "enabled": True,
+                "curve_tag": ns_tag,
+            },
+            {"cmd": ViewerCommandType.SET_ACTIVE_CURVE, "curve_tag": ns_tag},
+            {
+                "cmd": ViewerCommandType.UPDATE_HUD,
                 "text": f"Editing spline {ns_tag}: drag a control point.",
             },
         ]

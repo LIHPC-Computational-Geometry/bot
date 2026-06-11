@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 
 from bot.core.cad import CADModel
 from bot.viewer.tags import CAD_NS, encode, prefix
+from bot.viewer.contracts import SceneUpdateOp
 from bot.viewer.viewer import Viewer
 
 GEO_FILE = "data/profil_1.geo"
@@ -44,8 +45,8 @@ class TestViewerReceivesLoad(unittest.TestCase):
         viewer.connect_models(self.model)
         spy.send.assert_called_once()
         cmd, data = spy.send.call_args[0][0]
-        self.assertEqual(cmd, "add")
-        self.assertEqual(data["op"], "add")
+        self.assertEqual(cmd, SceneUpdateOp.ADD)
+        self.assertEqual(data["op"], SceneUpdateOp.ADD)
         self.assertEqual(
             set(data["changed_curves"].keys()), _expected_curve_tags(self.model)
         )
@@ -74,8 +75,8 @@ class TestViewerReceivesUpdate(unittest.TestCase):
         self.model.add_point([50.0, 50.0, 0.0])
         self.spy.send.assert_called_once()
         cmd, data = self.spy.send.call_args[0][0]
-        self.assertEqual(cmd, "update")
-        self.assertEqual(data["op"], "update")
+        self.assertEqual(cmd, SceneUpdateOp.UPDATE)
+        self.assertEqual(data["op"], SceneUpdateOp.UPDATE)
         self.assertEqual(
             set(data["changed_curves"].keys()), _expected_curve_tags(self.model)
         )
@@ -86,8 +87,8 @@ class TestViewerReceivesUpdate(unittest.TestCase):
         self.assertEqual(3, self.spy.send.call_count)
         for c in self.spy.send.call_args_list:
             cmd, data = c[0][0]
-            self.assertEqual(cmd, "update")
-            self.assertEqual(data["op"], "update")
+            self.assertEqual(cmd, SceneUpdateOp.UPDATE)
+            self.assertEqual(data["op"], SceneUpdateOp.UPDATE)
             self.assertEqual(
                 set(data["changed_curves"].keys()), _expected_curve_tags(self.model)
             )

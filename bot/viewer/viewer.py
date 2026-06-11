@@ -5,7 +5,15 @@ from typing import Callable, Optional, Any
 from bot.viewer.viewable import IViewable, CADAdapter, CompositeViewable
 from bot.core.cad import CADModel
 from bot.core.spline import SplineModel
-from bot.viewer.contracts import ScenePayload, ViewerCommand, ViewEvent
+from bot.viewer.contracts import (
+    ParentCommand,
+    ScenePayload,
+    SceneUpdateOp,
+    ViewerCommand,
+    ViewerCommandType,
+    ViewEvent,
+    ViewEventType,
+)
 
 """
 Viewer: launches Panda3D in a separate subprocess.
@@ -37,7 +45,7 @@ def _viewer_subprocess(conn, config_filename: str):
             try:
                 msg = conn.recv()
                 cmd_queue.put(msg)
-                if msg[0] == "exit":  # Exit command
+                if msg[0] == ViewerCommandType.EXIT:
                     break
             except EOFError:
                 break
@@ -61,6 +69,7 @@ def _viewer_subprocess(conn, config_filename: str):
 # ---------------------------------------------------------------------------
 
 VisualCallback = Callable[[Any], None] | None
+
 
 class Viewer:
     """
@@ -135,7 +144,7 @@ class Viewer:
         child_conn.close()  # useless in the parent process
 
         if self._viewable is not None:
-            self._send("add", self._viewable.get_delta_load())
+            self._send(SceneUpdateOp.ADD, self._viewable.get_delta_load())
 
         self._start_event_listener()
         return self
@@ -149,7 +158,7 @@ class Viewer:
         # 2. Send the stop signal to the subprocess
         if self._conn is not None:
             try:
-                self._send("exit", None)
+                self._send(ViewerCommandType.EXIT, None)
             except Exception:
                 pass
 
@@ -169,22 +178,25 @@ class Viewer:
 
     def highlight_curve(self, tag: str, color: list) -> "Viewer":
         """Colors the geometry associated with a tag."""
-        self._send("highlight_curve", {"tag": tag, "color": color})
+        self._send(ViewerCommandType.HIGHLIGHT_CURVE, {"tag": tag, "color": color})
         return self
 
     def set_hud_text(self, text: str) -> "Viewer":
         """Updates the text displayed in an overlay on the screen."""
-        self._send("update_hud", {"text": text})
+        self._send(ViewerCommandType.UPDATE_HUD, {"text": text})
         return self
 
     def set_edit_mode(
         self, enabled: bool, curve_tag: Optional[str | int] = None
     ) -> "Viewer":
-        self._send("set_edit_mode", {"enabled": enabled, "curve_tag": curve_tag})
+        self._send(
+            ViewerCommandType.SET_EDIT_MODE,
+            {"enabled": enabled, "curve_tag": curve_tag},
+        )
         return self
 
     def set_active_curve(self, curve_tag: Optional[str | int]) -> "Viewer":
-        self._send("set_active_curve", {"curve_tag": curve_tag})
+        self._send(ViewerCommandType.SET_ACTIVE_CURVE, {"curve_tag": curve_tag})
         return self
 
     def set_axis_constraint(self, mask: int) -> "Viewer":
@@ -193,7 +205,7 @@ class Viewer:
         except TypeError, ValueError:
             normalized = 7
         normalized = max(0, min(7, normalized))
-        self._send("set_axis_constraint", {"mask": normalized})
+        self._send(ViewerCommandType.SET_AXIS_CONSTRAINT, {"mask": normalized})
         return self
 
     def delete_curve(self, tag: str) -> "Viewer":
@@ -202,11 +214,11 @@ class Viewer:
         Génère un payload 'delete' complet pour le processus enfant.
         """
         payload: ScenePayload = {
-            "op": "delete",
+            "op": SceneUpdateOp.DELETE,
             "changed_curves": {},
-            "deleted_curves": [tag]
+            "deleted_curves": [tag],
         }
-        self._send("delete", payload)
+        self._send(SceneUpdateOp.DELETE, payload)
         return self
 
     def move_control_point(self, curve_tag: str, cp_index: int, new_pos: list[float]):
@@ -216,7 +228,7 @@ class Viewer:
             return
 
         event: ViewEvent = {
-            "event_type": "cp_pick_end",
+            "event_type": ViewEventType.CP_PICK_END,
             "curve_tag": curve_tag,
             "cp_index": cp_index,
             "world_pos": new_pos,
@@ -239,17 +251,15 @@ class Viewer:
         self._viewable = viewable
         viewable.bind_update(self._on_delta)
         if self._conn is not None:
-            self._send("add", viewable.get_delta_load())
+            self._send(SceneUpdateOp.ADD, viewable.get_delta_load())
         return self
-
-
 
     def _on_delta(self, payload: "ScenePayload") -> None:
         """Forward adapter deltas to the child process."""
-        op = payload.get("op", "update")
+        op = payload.get("op", SceneUpdateOp.UPDATE)
         self._send(op, payload)
 
-    def _send(self, cmd: str, data):
+    def _send(self, cmd: ParentCommand, data):
         """Send a ``(cmd, data)`` message to the child process over the pipe."""
         if self._conn is not None:
             try:
@@ -260,17 +270,19 @@ class Viewer:
     def _dispatch_commands(self, commands: list["ViewerCommand"]) -> None:
         for command in commands:
             cmd = command.get("cmd")
-            if cmd == "highlight_curve":
+            if cmd == ViewerCommandType.HIGHLIGHT_CURVE:
                 self.highlight_curve(command["tag"], command.get("color", [1, 1, 1, 1]))
-            elif cmd == "update_hud":
+            elif cmd == ViewerCommandType.UPDATE_HUD:
                 self.set_hud_text(command.get("text", ""))
-            elif cmd == "set_edit_mode":
+            elif cmd == ViewerCommandType.SET_EDIT_MODE:
                 self.set_edit_mode(
                     bool(command.get("enabled", False)),
                     command.get("curve_tag"),
                 )
-            elif cmd == "set_active_curve":
+            elif cmd == ViewerCommandType.SET_ACTIVE_CURVE:
                 self.set_active_curve(command.get("curve_tag"))
+            elif cmd == ViewerCommandType.SET_AXIS_CONSTRAINT:
+                self.set_axis_constraint(command.get("mask", 7))
 
     def _start_event_listener(self):
         """Daemon thread that receives events from the subprocess."""
@@ -280,13 +292,16 @@ class Viewer:
                 try:
                     if self._conn.poll(0.1):
                         event_type, data = self._conn.recv()
-                        if event_type == "pick" and self.on_pick is not None:
+                        if (
+                            event_type == ViewEventType.PICK
+                            and self.on_pick is not None
+                        ):
                             self.on_pick(data)
                             continue
 
                         view_event: ViewEvent = self._build_view_event(event_type, data)
 
-                        if event_type == "hover":
+                        if event_type == ViewEventType.HOVER:
                             tag = data
                             self._last_hovered = str(tag) if tag is not None else None
                             if self.on_hover is not None:
@@ -298,25 +313,28 @@ class Viewer:
                             continue
 
                         if (
-                            event_type == "curve_selected"
+                            event_type == ViewEventType.CURVE_SELECTED
                             and self.on_curve_selected is not None
                         ):
                             self.on_curve_selected(data)
                             continue
 
                         if (
-                            event_type == "cp_pick_start"
+                            event_type == ViewEventType.CP_PICK_START
                             and self.on_cp_pick_start is not None
                         ):
                             self.on_cp_pick_start(data)
                             continue
 
-                        if event_type == "cp_drag" and self.on_cp_drag is not None:
+                        if (
+                            event_type == ViewEventType.CP_DRAG
+                            and self.on_cp_drag is not None
+                        ):
                             self.on_cp_drag(data)
                             continue
 
                         if (
-                            event_type == "cp_pick_end"
+                            event_type == ViewEventType.CP_PICK_END
                             and self.on_cp_pick_end is not None
                         ):
                             self.on_cp_pick_end(data)
@@ -335,15 +353,14 @@ class Viewer:
         self._event_thread.start()
 
     @staticmethod
-    def _build_view_event(event_type: str, data) -> "ViewEvent":
+    def _build_view_event(event_type: ViewEventType, data) -> "ViewEvent":
         """Build a strict typing event from pipe"""
         if isinstance(data, dict):
             return {"event_type": event_type, **data}
 
-        if event_type == "hover":
-            return {"event_type": "hover", "tag": data}
-        elif event_type == "curve_selected":
-            return {"event_type": "curve_selected", "curve_tag": data}
+        if event_type == ViewEventType.HOVER:
+            return {"event_type": ViewEventType.HOVER, "tag": data}
+        if event_type == ViewEventType.CURVE_SELECTED:
+            return {"event_type": ViewEventType.CURVE_SELECTED, "curve_tag": data}
 
         return {"event_type": event_type, "data": data}
-

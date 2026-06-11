@@ -12,7 +12,7 @@ from bot.viewer.serialize import payload_to_geom_data
 from bot.control.camera import CameraController
 from bot.control.mouse import MouseHandler
 from bot.control.keyboard import KeyboardHandler
-from bot.viewer.contracts import ScenePayload
+from bot.viewer.contracts import ScenePayload, SceneUpdateOp, ViewerCommandType
 
 _DEFAULT_SCENE = {
     "background_color": [0.1, 0.1, 0.12],
@@ -100,24 +100,24 @@ class ViewerApp(ShowBase):
         while not self._cmd_queue.empty():
             try:
                 cmd, data = self._cmd_queue.get_nowait()
-                if cmd == "add":
+                if cmd == SceneUpdateOp.ADD:
                     self.__load_scene(data)
-                elif cmd == "update":
+                elif cmd == SceneUpdateOp.UPDATE:
                     self.__update_scene(data)
-                elif cmd == "delete":
+                elif cmd == SceneUpdateOp.DELETE:
                     self.__delete_in_scene(data)
-                elif cmd == "reload_config":
+                elif cmd == ViewerCommandType.RELOAD_CONFIG:
                     self._config = data
                     if self._scene:
                         self._scene.apply_settings(self.__scene_cfg())
                     if self._camera_controller:
                         self._camera_controller.apply_settings(self.__camera_cfg())
-                elif cmd == "highlight_curve":
+                elif cmd == ViewerCommandType.HIGHLIGHT_CURVE:
                     if self._scene:
                         self._scene.set_curve_color(data["tag"], data["color"])
-                elif cmd == "update_hud":
+                elif cmd == ViewerCommandType.UPDATE_HUD:
                     self.hud.setText(data["text"])
-                elif cmd == "set_edit_mode":
+                elif cmd == ViewerCommandType.SET_EDIT_MODE:
                     enabled = bool(data.get("enabled", False))
                     curve_tag = data.get("curve_tag")
                     self.mouse_handler.set_edit_mode(enabled, curve_tag)
@@ -125,14 +125,14 @@ class ViewerApp(ShowBase):
                         self._scene.set_edit_mode(enabled)
                         if curve_tag is not None:
                             self._scene.set_active_curve(curve_tag)
-                elif cmd == "set_active_curve":
+                elif cmd == ViewerCommandType.SET_ACTIVE_CURVE:
                     curve_tag = data.get("curve_tag")
                     self.mouse_handler.set_edit_mode(
                         self.mouse_handler.edit_mode_enabled, curve_tag
                     )
                     if self._scene:
                         self._scene.set_active_curve(curve_tag)
-                elif cmd == "set_axis_constraint":
+                elif cmd == ViewerCommandType.SET_AXIS_CONSTRAINT:
                     self.__set_axis_constraint(data.get("mask", 7))
             except queue.Empty:
                 break
@@ -160,7 +160,7 @@ class ViewerApp(ShowBase):
         if self._scene is not None:
             self._scene.clear()
 
-        if isinstance(payload, dict) and payload.get("op") == "add":
+        if isinstance(payload, dict) and payload.get("op") == SceneUpdateOp.ADD:
             geom_data = payload_to_geom_data(payload)
         else:
             geom_data = payload
@@ -183,7 +183,7 @@ class ViewerApp(ShowBase):
             self.__load_scene(payload)
             return
 
-        if isinstance(payload, dict) and payload.get("op") == "update":
+        if isinstance(payload, dict) and payload.get("op") == SceneUpdateOp.UPDATE:
             self._scene.apply_patch(payload)
             return
 

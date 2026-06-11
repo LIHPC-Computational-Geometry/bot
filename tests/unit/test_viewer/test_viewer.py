@@ -8,6 +8,8 @@ run without Panda3D or a display.
 import unittest
 from unittest.mock import MagicMock
 
+from bot.viewer.contracts import SceneUpdateOp, ViewerCommandType, ViewEventType
+
 
 class _FakeViewable:
     """Minimal IViewable stand-in."""
@@ -26,7 +28,7 @@ class _FakeViewable:
         self.unbound = True
 
     def get_delta_load(self):
-        return {"op": "add", "changed_curves": {}}
+        return {"op": SceneUpdateOp.ADD, "changed_curves": {}}
 
     def handle_event(self, event):
         return []
@@ -64,7 +66,7 @@ class TestViewerConnect(unittest.TestCase):
         viewer._conn = MagicMock()
         viewer._connect(_FakeViewable())
         viewer._conn.send.assert_called_with(
-            ("add", {"op": "add", "changed_curves": {}})
+            (SceneUpdateOp.ADD, {"op": SceneUpdateOp.ADD, "changed_curves": {}})
         )
 
 
@@ -105,21 +107,21 @@ class TestViewerPipe(unittest.TestCase):
         viewer = self._make_viewer()
         mock_conn = MagicMock()
         viewer._conn = mock_conn
-        payload = {"op": "update", "changed_curves": {"cad:1": {}}}
+        payload = {"op": SceneUpdateOp.UPDATE, "changed_curves": {"cad:1": {}}}
         viewer._on_delta(payload)
-        mock_conn.send.assert_called_once_with(("update", payload))
+        mock_conn.send.assert_called_once_with((SceneUpdateOp.UPDATE, payload))
 
     def test_ignores_broken_pipe(self):
         viewer = self._make_viewer()
         mock_conn = MagicMock()
         mock_conn.send.side_effect = BrokenPipeError
         viewer._conn = mock_conn
-        viewer._send("add", {})
-        viewer._on_delta({"op": "update", "changed_curves": {}})
+        viewer._send(SceneUpdateOp.ADD, {})
+        viewer._on_delta({"op": SceneUpdateOp.UPDATE, "changed_curves": {}})
 
     def test_noop_when_no_connection(self):
         viewer = self._make_viewer()
-        viewer._send("add", {})
+        viewer._send(SceneUpdateOp.ADD, {})
 
 
 class TestViewerAxisConstraint(unittest.TestCase):
@@ -133,12 +135,16 @@ class TestViewerAxisConstraint(unittest.TestCase):
     def test_set_axis_constraint_clamps_invalid_value(self):
         viewer = self._make_viewer()
         viewer.set_axis_constraint("oops")
-        viewer._conn.send.assert_called_with(("set_axis_constraint", {"mask": 7}))
+        viewer._conn.send.assert_called_with(
+            (ViewerCommandType.SET_AXIS_CONSTRAINT, {"mask": 7})
+        )
 
     def test_set_axis_constraint_clamps_out_of_range(self):
         viewer = self._make_viewer()
         viewer.set_axis_constraint(99)
-        viewer._conn.send.assert_called_with(("set_axis_constraint", {"mask": 7}))
+        viewer._conn.send.assert_called_with(
+            (ViewerCommandType.SET_AXIS_CONSTRAINT, {"mask": 7})
+        )
 
 
 class TestViewerMoveControlPoint(unittest.TestCase):
@@ -158,7 +164,7 @@ class TestViewerMoveControlPoint(unittest.TestCase):
         viewer.move_control_point("spline:curve-1", 1, [1.0, 2.0, 3.0])
         viewable.handle_event.assert_called_once()
         event = viewable.handle_event.call_args[0][0]
-        self.assertEqual(event["event_type"], "cp_pick_end")
+        self.assertEqual(event["event_type"], ViewEventType.CP_PICK_END)
         self.assertEqual(event["curve_tag"], "spline:curve-1")
         self.assertEqual(event["world_pos"], [1.0, 2.0, 3.0])
 

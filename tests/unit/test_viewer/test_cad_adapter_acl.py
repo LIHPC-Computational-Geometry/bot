@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 from bot.core.cad import CADModel
 from bot.viewer.serialize import bytes_to_point_list
 from bot.viewer.tags import encode, CAD_NS
+from bot.viewer.contracts import SceneUpdateOp, ViewerCommandType, ViewEventType
 from bot.viewer.viewable import CADAdapter
 
 GEO_FILE = "data/profil_1.geo"
@@ -22,7 +23,7 @@ class TestCADAdapterACLEventGuards(unittest.TestCase):
 
     def test_drop_malformed_tag_on_curve_selected(self):
         commands = self.adapter.handle_event(
-            {"event_type": "curve_selected", "tag": "not-namespaced"}
+            {"event_type": ViewEventType.CURVE_SELECTED, "tag": "not-namespaced"}
         )
         self.assertEqual(commands, [])
 
@@ -30,22 +31,26 @@ class TestCADAdapterACLEventGuards(unittest.TestCase):
         self.model.has_curve.return_value = False
         tag = encode(CAD_NS, 999)
         commands = self.adapter.handle_event(
-            {"event_type": "curve_selected", "tag": tag, "curve_tag": tag}
+            {"event_type": ViewEventType.CURVE_SELECTED, "tag": tag, "curve_tag": tag}
         )
         self.assertEqual(commands, [])
 
     def test_valid_tag_routes_curve_selected(self):
         tag = encode(CAD_NS, 5)
         commands = self.adapter.handle_event(
-            {"event_type": "curve_selected", "tag": tag, "curve_tag": tag}
+            {"event_type": ViewEventType.CURVE_SELECTED, "tag": tag, "curve_tag": tag}
         )
         self.assertEqual(
             commands,
             [
-                {"cmd": "set_edit_mode", "enabled": True, "curve_tag": tag},
-                {"cmd": "set_active_curve", "curve_tag": tag},
                 {
-                    "cmd": "update_hud",
+                    "cmd": ViewerCommandType.SET_EDIT_MODE,
+                    "enabled": True,
+                    "curve_tag": tag,
+                },
+                {"cmd": ViewerCommandType.SET_ACTIVE_CURVE, "curve_tag": tag},
+                {
+                    "cmd": ViewerCommandType.UPDATE_HUD,
                     "text": f"Editing curve {tag}: drag a control point.",
                 },
             ],
@@ -65,7 +70,7 @@ class TestCADAdapterACLWithModel(unittest.TestCase):
 
     def test_get_delta_load_emits_op_add_with_curves(self):
         payload = self.adapter.get_delta_load()
-        self.assertEqual(payload["op"], "add")
+        self.assertEqual(payload["op"], SceneUpdateOp.ADD)
         self.assertEqual(
             set(payload["changed_curves"].keys()),
             {encode(CAD_NS, tag) for tag in self.model.get_curve_tags()},
@@ -83,7 +88,7 @@ class TestCADAdapterACLWithModel(unittest.TestCase):
         self.model.add_point([50.0, 50.0, 0.0])
         self.assertEqual(callback.call_count, 1)
         payload = callback.call_args[0][0]
-        self.assertEqual(payload["op"], "update")
+        self.assertEqual(payload["op"], SceneUpdateOp.UPDATE)
         self.assertEqual(
             set(payload["changed_curves"].keys()),
             {encode(CAD_NS, tag) for tag in self.model.get_curve_tags()},

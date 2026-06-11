@@ -7,7 +7,7 @@ from typing import Any, Iterable, Sequence
 
 import numpy as np
 
-from bot.viewer.contracts import CurveDelta, CurveGeometry, ScenePayload
+from bot.viewer.contracts import CurveDelta, CurveGeometry, ScenePayload, SceneUpdateOp
 
 
 def floats_to_bytes(points: Sequence[Sequence[float]] | np.ndarray) -> bytes:
@@ -74,7 +74,7 @@ def merge_deltas(*payloads: ScenePayload) -> ScenePayload:
     bounds: dict[str, Any] | None = None
     points: bytes | None = None
     edges: list[tuple[int, int, str]] | None = None
-    op: str = "add"
+    op: SceneUpdateOp = SceneUpdateOp.ADD
 
     for payload in payloads:
         op = payload.get("op", op)

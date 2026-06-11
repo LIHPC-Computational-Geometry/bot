@@ -2,6 +2,7 @@ from direct.showbase.InputStateGlobal import inputState
 from panda3d.core import MouseButton, Point2, Point3
 
 from bot.control.picker import RayPicker
+from bot.viewer.contracts import ViewEventType
 from bot.math.constraints import ConstraintManager
 
 
@@ -80,7 +81,7 @@ class MouseHandler:
                     curve.rebuild_cp_collision()
 
             self.base._on_event_cb(
-                "cp_pick_end",
+                ViewEventType.CP_PICK_END,
                 {
                     "curve_tag": self.drag_curve_tag,
                     "cp_index": self.drag_cp_index,
@@ -98,7 +99,7 @@ class MouseHandler:
 
         if hovered_tag != self.last_hovered_tag:
             self.last_hovered_tag = hovered_tag
-            self.base._on_event_cb("hover", hovered_tag)
+            self.base._on_event_cb(ViewEventType.HOVER, hovered_tag)
 
     def _handle_cp_interaction(self, m_pos: Point2, left_down: bool):
         if not self.edit_mode_enabled and not self.dragging_cp:
@@ -162,7 +163,7 @@ class MouseHandler:
             )
 
         self.base._on_event_cb(
-            "cp_pick_start",
+            ViewEventType.CP_PICK_START,
             {
                 "curve_tag": self.drag_curve_tag,
                 "cp_index": self.drag_cp_index,
@@ -189,7 +190,7 @@ class MouseHandler:
             )
 
         self.base._on_event_cb(
-            "cp_drag",
+            ViewEventType.CP_DRAG,
             {
                 "curve_tag": self.drag_curve_tag,
                 "cp_index": self.drag_cp_index,
@@ -225,7 +226,7 @@ class MouseHandler:
             metadata.get("pick_kind") == "curve"
             and metadata.get("curve_tag") is not None
         ):
-            self.base._on_event_cb("curve_selected", metadata["curve_tag"])
+            self.base._on_event_cb(ViewEventType.CURVE_SELECTED, metadata["curve_tag"])
 
     def _handle_drag(self, curr_pos: Point2):
         if self.dragging_cp:
