@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypedDict, Union
 
 try:
     from typing import NotRequired
@@ -42,23 +42,46 @@ class ScenePayload(TypedDict):
     edges: NotRequired[list[tuple[int, int, str]]]
 
 
-class ViewEvent(TypedDict, total=False):
-    """Upstream user-interaction event from the child process."""
+class EventHover(TypedDict):
+    event_type: Literal["hover"]
+    tag: str | None
 
-    event_type: str
-    tag: str
+class EventCurveSelected(TypedDict):
+    event_type: Literal["curve_selected"]
+    curve_tag: str
+
+class EventCPInteraction(TypedDict):
+    event_type: Literal["cp_pick_start", "cp_drag", "cp_pick_end"]
     curve_tag: str
     cp_index: int
     world_pos: list[float]
 
+class EventPick(TypedDict):
+    event_type: Literal["pick"]
+    world_pos: list[float]
 
-class ViewerCommand(TypedDict, total=False):
-    """Downstream command produced by adapters for the Viewer to dispatch."""
+ViewEvent = Union[EventHover, EventCurveSelected, EventCPInteraction, EventPick]
 
-    cmd: str
+
+
+class CmdHighlightCurve(TypedDict):
+    cmd: Literal["highlight_curve"]
     tag: str
     color: list[float]
+
+class CmdUpdateHud(TypedDict):
+    cmd: Literal["update_hud"]
     text: str
+
+class CmdSetEditMode(TypedDict):
+    cmd: Literal["set_edit_mode"]
     enabled: bool
-    curve_tag: str | int | None
-    mask: int
+    curve_tag: str | None
+
+class CmdSetActiveCurve(TypedDict):
+    cmd: Literal["set_active_curve"]
+    curve_tag: str | None
+
+ViewerCommand = Union[
+    CmdHighlightCurve, CmdUpdateHud, CmdSetEditMode, CmdSetActiveCurve
+]

@@ -121,6 +121,19 @@ class Viewer:
         self._send("set_axis_constraint", {"mask": normalized})
         return self
 
+    def delete_curve(self, tag: str) -> "Viewer":
+        """
+        Supprime explicitement une courbe de la scène via IPython.
+        Génère un payload 'delete' complet pour le processus enfant.
+        """
+        payload: ScenePayload = {
+            "op": "delete",
+            "changed_curves": {}, # Requis par le format, mais vide ici
+            "deleted_curves": [tag]
+        }
+        self._send("delete", payload)
+        return self
+
     def _connect(self, viewable: "IViewable") -> "Viewer":
         """
         Connects this viewer to an IViewable source.
@@ -297,9 +310,16 @@ class Viewer:
 
     @staticmethod
     def _build_view_event(event_type: str, data) -> "ViewEvent":
+        """Build a strict typing event from pipe"""
         if isinstance(data, dict):
             return {"event_type": event_type, **data}
-        return {"event_type": event_type, "tag": data, "curve_tag": data}
+
+        if event_type == "hover":
+            return {"event_type": "hover", "tag": data}
+        elif event_type == "curve_selected":
+            return {"event_type": "curve_selected", "curve_tag": data}
+
+        return {"event_type": event_type, "data": data}
 
     def bezier_conversion(self, degree: int):
         """Convert the last hovered CAD curve into a Bezier spline."""
@@ -311,17 +331,17 @@ class Viewer:
             return
         self.set_hud_text("Bezier conversion is not yet implemented for IViewable.")
 
-    def move_control_point(self, tag: str, cp_index: int, new_pos: list[float]):
-        """Move a control point via the viewable event path."""
+    def move_control_point(self, curve_tag: str, cp_index: int, new_pos: list[float]):
+        """Move a control point via the viewable event path from IPython."""
         if self._viewable is None:
             self.set_hud_text("No viewable connected.")
             return
+
         event: ViewEvent = {
             "event_type": "cp_pick_end",
-            "tag": tag,
-            "curve_tag": tag,
+            "curve_tag": curve_tag,
             "cp_index": cp_index,
             "world_pos": new_pos,
         }
         self._dispatch_commands(self._viewable.handle_event(event))
-        self.set_hud_text(f"Control point {cp_index} of curve {tag} moved.")
+        self.set_hud_text(f"Control point {cp_index} of curve {curve_tag} moved.")

@@ -82,7 +82,7 @@ class MouseHandler:
             self.base._on_event_cb(
                 "cp_pick_end",
                 {
-                    "tag": self.drag_curve_tag,
+                    "curve_tag": self.drag_curve_tag,
                     "cp_index": self.drag_cp_index,
                     "world_pos": world_pos,
                 },
@@ -164,7 +164,7 @@ class MouseHandler:
         self.base._on_event_cb(
             "cp_pick_start",
             {
-                "tag": self.drag_curve_tag,
+                "curve_tag": self.drag_curve_tag,
                 "cp_index": self.drag_cp_index,
                 "world_pos": list(start_point),
             },
@@ -191,7 +191,7 @@ class MouseHandler:
         self.base._on_event_cb(
             "cp_drag",
             {
-                "tag": self.drag_curve_tag,
+                "curve_tag": self.drag_curve_tag,
                 "cp_index": self.drag_cp_index,
                 "world_pos": world_pos,
             },
