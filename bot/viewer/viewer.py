@@ -95,12 +95,7 @@ class Viewer:
         self._running = False
         self._last_hovered: str | None = None
 
-        self.on_pick: VisualCallback = None
-        self.on_hover: VisualCallback = None
-        self.on_curve_selected: VisualCallback = None
-        self.on_cp_pick_start: VisualCallback = None
-        self.on_cp_drag: VisualCallback = None
-        self.on_cp_pick_end: VisualCallback = None
+        self._callbacks: dict[ViewEventType, VisualCallback] = {}
 
     # =========================================================================
     # COMMANDES (Public API)
@@ -175,6 +170,16 @@ class Viewer:
 
         self._event_thread = None
         print("Stopped Viewer")
+
+    def add_callback(self, event_type: ViewEventType, callback: VisualCallback) -> "Viewer":
+        """Associate a personalized function for a specific event."""
+        self._callbacks[event_type] = callback
+        return self
+
+    def remove_callback(self, event_type: ViewEventType) -> "Viewer":
+        """Delete the personalized callback for an event."""
+        self._callbacks.pop(event_type, None)
+        return self
 
     def highlight_curve(self, tag: str, color: list) -> "Viewer":
         """Colors the geometry associated with a tag."""
@@ -290,63 +295,35 @@ class Viewer:
         def _listen():
             while self._running:
                 try:
-                    if self._conn.poll(0.1):
-                        event_type, data = self._conn.recv()
-                        if (
-                            event_type == ViewEventType.PICK
-                            and self.on_pick is not None
-                        ):
-                            self.on_pick(data)
-                            continue
+                    # On attend un message, on passe à la suite si rien n'arrive
+                    if not self._conn.poll(0.1):
+                        continue
 
-                        view_event: ViewEvent = self._build_view_event(event_type, data)
+                    event_type, data = self._conn.recv()
 
-                        if event_type == ViewEventType.HOVER:
-                            tag = data
-                            self._last_hovered = str(tag) if tag is not None else None
-                            if self.on_hover is not None:
-                                self.on_hover(data)
-                            elif self._viewable is not None:
-                                self._dispatch_commands(
-                                    self._viewable.handle_event(view_event)
-                                )
-                            continue
+                    # 1. Maintien de l'état interne de base
+                    if event_type == ViewEventType.HOVER:
+                        self._last_hovered = str(data) if data is not None else None
 
-                        if (
-                            event_type == ViewEventType.CURVE_SELECTED
-                            and self.on_curve_selected is not None
-                        ):
-                            self.on_curve_selected(data)
-                            continue
+                    # 2. Priorité au comportement utilisateur (Callback)
+                    if event_type in self._callbacks and self._callbacks[event_type] is not None:
+                        self._callbacks[event_type](data)
+                        continue  # On arrête ici, on a surchargé le comportement par défaut
 
-                        if (
-                            event_type == ViewEventType.CP_PICK_START
-                            and self.on_cp_pick_start is not None
-                        ):
-                            self.on_cp_pick_start(data)
-                            continue
+                    # 3. Comportement par défaut (Adaptateurs CAO/Spline)
+                    if self._viewable is not None:
+                        # On formate pour l'adaptateur
+                        view_event = self._build_view_event(event_type, data)
 
-                        if (
-                            event_type == ViewEventType.CP_DRAG
-                            and self.on_cp_drag is not None
-                        ):
-                            self.on_cp_drag(data)
-                            continue
+                        # L'adaptateur décide de ce qu'il faut afficher
+                        commands = self._viewable.handle_event(view_event)
 
-                        if (
-                            event_type == ViewEventType.CP_PICK_END
-                            and self.on_cp_pick_end is not None
-                        ):
-                            self.on_cp_pick_end(data)
-                            continue
+                        # Le Viewer envoie les ordres (HUD, couleurs...) au processus 3D
+                        self._dispatch_commands(commands)
 
-                        if self._viewable is not None:
-                            self._dispatch_commands(
-                                self._viewable.handle_event(view_event)
-                            )
-                except EOFError, BrokenPipeError, AttributeError:
+                except (EOFError, BrokenPipeError, AttributeError):
                     break
-                except Exception:
+                except Exception as e:
                     pass
 
         self._event_thread = threading.Thread(target=_listen, daemon=True)
