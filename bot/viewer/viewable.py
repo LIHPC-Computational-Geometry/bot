@@ -104,7 +104,8 @@ class CADAdapter:
                 return self.__handle_curve_selected(str(tag))
             case "pick" if event.get("world_pos") is None:
                 try:
-                    self._model.add_point(list(event["world_pos"]))
+                    world_pos = event["world_pos"]
+                    self._model.add_point(list(world_pos))
                 except Exception as exc:
                     _logger.warning("CAD pick add_point failed: %s", exc)
                 return []

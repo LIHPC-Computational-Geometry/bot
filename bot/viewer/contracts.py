@@ -3,11 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Literal, TypedDict, Union
-
-try:
-    from typing import NotRequired
-except ImportError:
-    from typing_extensions import NotRequired  # type: ignore[attr-defined]
+from typing import NotRequired
 
 from bot.core.spline import BEZIER_TYP, NURBS_TYP
 

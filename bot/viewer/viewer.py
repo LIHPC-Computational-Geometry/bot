@@ -1,7 +1,7 @@
 from __future__ import annotations
 import multiprocessing as mp
 import threading
-from typing import Callable, Optional
+from typing import Callable, Optional, Any
 from bot.viewer.viewable import IViewable, CADAdapter, CompositeViewable
 from bot.core.cad import CADModel
 from bot.core.spline import SplineModel
@@ -60,6 +60,7 @@ def _viewer_subprocess(conn, config_filename: str):
 # Public API
 # ---------------------------------------------------------------------------
 
+VisualCallback = Callable[[Any], None] | None
 
 class Viewer:
     """
@@ -85,68 +86,16 @@ class Viewer:
         self._running = False
         self._last_hovered: str | None = None
 
-        self.on_pick: Optional[Callable] = None
-        self.on_hover: Optional[Callable] = None
-        self.on_curve_selected: Optional[Callable] = None
-        self.on_cp_pick_start: Optional[Callable] = None
-        self.on_cp_drag: Optional[Callable] = None
-        self.on_cp_pick_end: Optional[Callable] = None
+        self.on_pick: VisualCallback = None
+        self.on_hover: VisualCallback = None
+        self.on_curve_selected: VisualCallback = None
+        self.on_cp_pick_start: VisualCallback = None
+        self.on_cp_drag: VisualCallback = None
+        self.on_cp_pick_end: VisualCallback = None
 
-    def highlight_curve(self, tag: str, color: list) -> "Viewer":
-        """Colors the geometry associated with a tag."""
-        self._send("highlight_curve", {"tag": tag, "color": color})
-        return self
-
-    def set_hud_text(self, text: str) -> "Viewer":
-        """Updates the text displayed in an overlay on the screen."""
-        self._send("update_hud", {"text": text})
-        return self
-
-    def set_edit_mode(
-        self, enabled: bool, curve_tag: Optional[str | int] = None
-    ) -> "Viewer":
-        self._send("set_edit_mode", {"enabled": enabled, "curve_tag": curve_tag})
-        return self
-
-    def set_active_curve(self, curve_tag: Optional[str | int]) -> "Viewer":
-        self._send("set_active_curve", {"curve_tag": curve_tag})
-        return self
-
-    def set_axis_constraint(self, mask: int) -> "Viewer":
-        try:
-            normalized = int(mask)
-        except TypeError, ValueError:
-            normalized = 7
-        normalized = max(0, min(7, normalized))
-        self._send("set_axis_constraint", {"mask": normalized})
-        return self
-
-    def delete_curve(self, tag: str) -> "Viewer":
-        """
-        Supprime explicitement une courbe de la scène via IPython.
-        Génère un payload 'delete' complet pour le processus enfant.
-        """
-        payload: ScenePayload = {
-            "op": "delete",
-            "changed_curves": {}, # Requis par le format, mais vide ici
-            "deleted_curves": [tag]
-        }
-        self._send("delete", payload)
-        return self
-
-    def _connect(self, viewable: "IViewable") -> "Viewer":
-        """
-        Connects this viewer to an IViewable source.
-        Can be called before or after run().
-        Returns self for chaining.
-        """
-        if self._viewable is not None:
-            self.disconnect()
-        self._viewable = viewable
-        viewable.bind_update(self._on_delta)
-        if self._conn is not None:
-            self._send("add", viewable.get_delta_load())
-        return self
+    # =========================================================================
+    # COMMANDES (Public API)
+    # =========================================================================
 
     def connect_models(
         self,
@@ -217,6 +166,83 @@ class Viewer:
 
         self._event_thread = None
         print("Stopped Viewer")
+
+    def highlight_curve(self, tag: str, color: list) -> "Viewer":
+        """Colors the geometry associated with a tag."""
+        self._send("highlight_curve", {"tag": tag, "color": color})
+        return self
+
+    def set_hud_text(self, text: str) -> "Viewer":
+        """Updates the text displayed in an overlay on the screen."""
+        self._send("update_hud", {"text": text})
+        return self
+
+    def set_edit_mode(
+        self, enabled: bool, curve_tag: Optional[str | int] = None
+    ) -> "Viewer":
+        self._send("set_edit_mode", {"enabled": enabled, "curve_tag": curve_tag})
+        return self
+
+    def set_active_curve(self, curve_tag: Optional[str | int]) -> "Viewer":
+        self._send("set_active_curve", {"curve_tag": curve_tag})
+        return self
+
+    def set_axis_constraint(self, mask: int) -> "Viewer":
+        try:
+            normalized = int(mask)
+        except TypeError, ValueError:
+            normalized = 7
+        normalized = max(0, min(7, normalized))
+        self._send("set_axis_constraint", {"mask": normalized})
+        return self
+
+    def delete_curve(self, tag: str) -> "Viewer":
+        """
+        Supprime explicitement une courbe de la scène.
+        Génère un payload 'delete' complet pour le processus enfant.
+        """
+        payload: ScenePayload = {
+            "op": "delete",
+            "changed_curves": {},
+            "deleted_curves": [tag]
+        }
+        self._send("delete", payload)
+        return self
+
+    def move_control_point(self, curve_tag: str, cp_index: int, new_pos: list[float]):
+        """Move a control point via the viewable event path from IPython."""
+        if self._viewable is None:
+            self.set_hud_text("No viewable connected.")
+            return
+
+        event: ViewEvent = {
+            "event_type": "cp_pick_end",
+            "curve_tag": curve_tag,
+            "cp_index": cp_index,
+            "world_pos": new_pos,
+        }
+        self._dispatch_commands(self._viewable.handle_event(event))
+        self.set_hud_text(f"Control point {cp_index} of curve {curve_tag} moved.")
+
+    # =========================================================================
+    # INTERNAL FUNCTIONS
+    # =========================================================================
+
+    def _connect(self, viewable: "IViewable") -> "Viewer":
+        """
+        Connects this viewer to an IViewable source.
+        Can be called before or after run().
+        Returns self for chaining.
+        """
+        if self._viewable is not None:
+            self.disconnect()
+        self._viewable = viewable
+        viewable.bind_update(self._on_delta)
+        if self._conn is not None:
+            self._send("add", viewable.get_delta_load())
+        return self
+
+
 
     def _on_delta(self, payload: "ScenePayload") -> None:
         """Forward adapter deltas to the child process."""
@@ -321,27 +347,3 @@ class Viewer:
 
         return {"event_type": event_type, "data": data}
 
-    def bezier_conversion(self, degree: int):
-        """Convert the last hovered CAD curve into a Bezier spline."""
-        if self._last_hovered is None:
-            self.set_hud_text("Impossible to convert: no curve selected")
-            return
-        if not isinstance(self._viewable, CompositeViewable):
-            self.set_hud_text("Bezier conversion requires a CompositeViewable.")
-            return
-        self.set_hud_text("Bezier conversion is not yet implemented for IViewable.")
-
-    def move_control_point(self, curve_tag: str, cp_index: int, new_pos: list[float]):
-        """Move a control point via the viewable event path from IPython."""
-        if self._viewable is None:
-            self.set_hud_text("No viewable connected.")
-            return
-
-        event: ViewEvent = {
-            "event_type": "cp_pick_end",
-            "curve_tag": curve_tag,
-            "cp_index": cp_index,
-            "world_pos": new_pos,
-        }
-        self._dispatch_commands(self._viewable.handle_event(event))
-        self.set_hud_text(f"Control point {cp_index} of curve {curve_tag} moved.")
