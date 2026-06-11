@@ -2,10 +2,69 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, TypedDict, Union
-from typing import NotRequired
+from typing import Any, Literal, TypedDict, Union, NotRequired
+from enum import Enum
 
 from bot.core.spline import BEZIER_TYP, NURBS_TYP
+
+
+class SceneUpdateOp(str, Enum):
+    """
+    Category 1: Geometric Update Flow (Parent -> Child)
+    Heavy payloads used to synchronize 3D topology and geometry.
+    """
+    ADD = "add"          # Initializes or fully rebuilds the scene.
+    UPDATE = "update"    # Applies a partial patch to existing geometries.
+    DELETE = "delete"    # Removes one or multiple geometries from the scene.
+
+
+class ViewerCommandType(str, Enum):
+    """
+    Category 2: Display State Commands (Parent -> Child)
+    Orders given to the GUI by the parent process.
+    """
+    # FIXME Color changes on hover should be detected and applied locally by the child.
+    HIGHLIGHT_CURVE = "highlight_curve"
+
+    # Legitimate: The parent sends domain-specific data (calculated by the kernel) that the child lacks.
+    UPDATE_HUD = "update_hud"
+
+    # Legitimate: The parent (script/kernel) forces the UI into edit mode programmatically.
+    SET_EDIT_MODE = "set_edit_mode"
+
+    # Legitimate: The parent targets a specific curve programmatically.
+    SET_ACTIVE_CURVE = "set_active_curve"
+
+    # FIXME The child already has the math logic (ConstraintManager) to calculate axes locally.
+    SET_AXIS_CONSTRAINT = "set_axis_constraint"
+
+    # Legitimate: The parent commands the child process to terminate gracefully.
+    EXIT = "exit"
+
+
+class ViewEventType(str, Enum):
+    """
+    Category 3: User Interaction Events (Child -> Parent)
+    Notifications of physical user actions occurring in the 3D window.
+    """
+    # FIXME If no custom user callback is set, sending this just to trigger a HIGHLIGHT_CURVE is wasteful.
+    HOVER = "hover"
+
+    # Legitimate: The parent needs to know which curve was clicked to update its internal state.
+    CURVE_SELECTED = "curve_selected"
+
+    # Legitimate: Notifies the parent that a control point drag operation has started.
+    CP_PICK_START = "cp_pick_start"
+
+    # FIXME Sending mouse position at 60 FPS clogs the IPC pipe.
+    # The child should handle real-time visual updates locally via `preview_evaluate`.
+    CP_DRAG = "cp_drag"
+
+    # Legitimate (Crucial): The parent receives the final position to permanently update the math kernel.
+    CP_PICK_END = "cp_pick_end"
+
+    # Legitimate: The parent receives an absolute 3D coordinate to instantiate a new free point.
+    PICK = "pick"
 
 
 class CurveGeometry(TypedDict):
