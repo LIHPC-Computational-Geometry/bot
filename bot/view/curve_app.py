@@ -219,11 +219,13 @@ class CurveApp:
             self.cp_collision_node.removeNode()
 
     def set_cp_color(self, cp_index: int, color: List[float]):
+        """Updates the color of a specific control point and refreshes its rendering."""
         self.cp_color[cp_index] = color
         if self.cp_node is not None:
             self._draw_control_points(self.cp_node)
 
     def set_color(self, color: List[float]):
+        """Sets the color of the main curve geometry."""
         if self.curve_render_node:
             self.curve_render_node.setColor(*color[:4], 1)
             self.curve_render_node.setLightOff(1)
@@ -232,6 +234,7 @@ class CurveApp:
             self.cp_node.show() if self.cp_visible else self.cp_node.hide()
 
     def set_cp_visible(self, visible: bool):
+        """Toggles the visibility and collision mask of the control points."""
         self.cp_visible = visible
         if self.cp_node is None:
             return
@@ -245,6 +248,7 @@ class CurveApp:
                 cnp.setCollideMask(current_mask)
 
     def preview_evaluate(self, cp_index: int, new_pos: List[float]):
+        """Updates a control point position and re-evaluates the curve for real-time preview."""
         if not self.control_points or not (0 <= cp_index < len(self.control_points)):
             return
 
@@ -266,6 +270,7 @@ class CurveApp:
             self._draw_control_points(self.cp_render_node)
 
     def update_collision_sizes(self, units_per_pixel: float):
+        """Adjusts collision radius based on the current zoom level to maintain consistent screen-space picking."""
         safe_units = max(0.001, units_per_pixel)
         self.curve_pick_radius = safe_units * 6.0
         self.cp_pick_radius = safe_units * 12.0

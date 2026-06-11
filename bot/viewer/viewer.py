@@ -121,7 +121,7 @@ class Viewer:
         self._send("set_axis_constraint", {"mask": normalized})
         return self
 
-    def connect(self, viewable: "IViewable") -> "Viewer":
+    def _connect(self, viewable: "IViewable") -> "Viewer":
         """
         Connects this viewer to an IViewable source.
         Can be called before or after run().
@@ -144,7 +144,7 @@ class Viewer:
 
         if spline_model is None:
             return self.connect(CompositeViewable({"cad": CADAdapter(cad_model)}))
-        return self.connect(CompositeViewable.from_models(cad_model, spline_model))
+        return self._connect(CompositeViewable.from_models(cad_model, spline_model))
 
     def disconnect(self) -> "Viewer":
         """Detach the viewer from the current viewable."""
@@ -303,8 +303,6 @@ class Viewer:
 
     def bezier_conversion(self, degree: int):
         """Convert the last hovered CAD curve into a Bezier spline."""
-        from bot.viewer.viewable import CompositeViewable
-
         if self._last_hovered is None:
             self.set_hud_text("Impossible to convert: no curve selected")
             return

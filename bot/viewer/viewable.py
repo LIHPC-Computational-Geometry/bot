@@ -1,4 +1,9 @@
-"""IViewable adapters bridging core models to the viewer IPC layer."""
+"""IViewable adapters bridging core models to the viewer IPC layer.
+
+Adapters translate domain models (CAD, splines) into ``ScenePayload`` deltas
+for the render subprocess and turn ``ViewEvent`` interactions into
+``ViewerCommand`` responses.
+"""
 
 from __future__ import annotations
 
@@ -30,17 +35,29 @@ _logger = logging.getLogger(__name__)
 class IViewable(Protocol):
     """Interface for objects that can be rendered and observed by the Viewer."""
 
-    def bind_update(self, callback: Callable[[ScenePayload], None]) -> None: ...
+    def bind_update(self, callback: Callable[[ScenePayload], None]) -> None:
+        """Register a callback invoked when the underlying model changes."""
+        ...
 
-    def unbind_update(self) -> None: ...
+    def unbind_update(self) -> None:
+        """Clear the update callback."""
+        ...
 
-    def get_delta_load(self) -> ScenePayload: ...
+    def get_delta_load(self) -> ScenePayload:
+        """Return the full scene payload used for initial load."""
+        ...
 
-    def handle_event(self, event: ViewEvent) -> list[ViewerCommand]: ...
+    def handle_event(self, event: ViewEvent) -> list[ViewerCommand]:
+        """Translate a user interaction into viewer commands."""
+        ...
 
 
 class CADAdapter:
-    """Anti-Corruption Layer between namespaced UI tags and gmsh CAD geometry."""
+    """
+    Adapter bridging a CADModel to the Viewer IPC layer.
+
+    It converts CAD geometry into renderable deltas and handles user interactions.
+    """
 
     def __init__(self, model: CADModel):
         self._model = model
@@ -49,12 +66,15 @@ class CADAdapter:
         self._model.add_observer(self)
 
     def bind_update(self, callback: Callable[[ScenePayload], None]) -> None:
+        """Register a callback invoked when the CAD model changes."""
         self._update_callback = callback
 
     def unbind_update(self) -> None:
+        """Clear the update callback."""
         self._update_callback = None
 
     def get_delta_load(self) -> ScenePayload:
+        """Build the initial add payload with curves, bounds, and flat topology."""
         changed_curves = self._build_changed_curves()
         flat_points, flat_edges = self._build_flat_topology(changed_curves)
         payload: ScenePayload = {
@@ -71,26 +91,28 @@ class CADAdapter:
         return payload
 
     def handle_event(self, event: ViewEvent) -> list[ViewerCommand]:
+        """Dispatch hover, selection, pick, and control-point events."""
         event_type = event.get("event_type", "")
         tag = event.get("tag") or event.get("curve_tag")
 
-        if event_type == "hover":
-            return self._handle_hover(tag)
-        if event_type == "curve_selected":
-            if tag is None or self._resolve_cad_tag_str(str(tag)) is None:
+        match event_type:
+            case "hover":
+                return self._handle_hover(tag)
+            case "curve_selected":
+                if tag is None or self._resolve_cad_tag_str(str(tag)) is None:
+                    return []
+                return self._handle_curve_selected(str(tag))
+            case "pick" if event.get("world_pos") is None:
+                try:
+                    self._model.add_point(list(event["world_pos"]))
+                except Exception as exc:
+                    _logger.warning("CAD pick add_point failed: %s", exc)
                 return []
-            return self._handle_curve_selected(str(tag))
-        if event_type == "pick" and event.get("world_pos") is not None:
-            try:
-                self._model.add_point(list(event["world_pos"]))
-            except Exception as exc:
-                _logger.warning("CAD pick add_point failed: %s", exc)
-            return []
-        if event_type == "cp_pick_end":
-            return self._handle_cp_pick_end(event)
-        return []
+            case _:
+                return []
 
     def update(self, _model: CADModel) -> None:
+        """Observer callback: push an update delta when the model changes."""
         if self._update_callback is not None:
             self._update_callback(
                 {
@@ -100,12 +122,14 @@ class CADAdapter:
             )
 
     def _resolve_cad_tag(self, event: ViewEvent) -> int | None:
+        """Extract and validate the CAD local curve id from an event."""
         raw = event.get("curve_tag") or event.get("tag")
         if raw is None:
             return None
         return self._resolve_cad_tag_str(str(raw))
 
     def _resolve_cad_tag_str(self, tag_str: str) -> int | None:
+        """Return the CAD local id for a namespaced tag, or None if invalid."""
         if not is_namespaced(tag_str):
             return None
         decoded = decode(tag_str)
@@ -117,6 +141,7 @@ class CADAdapter:
         return local_id
 
     def _build_changed_curves(self) -> dict[str, CurveDelta]:
+        """Discretize all CAD curves into namespaced render deltas."""
         changed: dict[str, CurveDelta] = {}
         try:
             for gmsh_tag, (
@@ -136,6 +161,7 @@ class CADAdapter:
     def _build_flat_topology(
         self, changed_curves: dict[str, CurveDelta]
     ) -> tuple[list[list[float]], list[tuple[int, int, str]]]:
+        """Flatten per-curve geometry into a single point list and edge index."""
         flat_points: list[list[float]] = []
         flat_edges: list[tuple[int, int, str]] = []
 
@@ -151,6 +177,7 @@ class CADAdapter:
         return flat_points, flat_edges
 
     def _handle_hover(self, tag: str | None) -> list[ViewerCommand]:
+        """Update HUD text and curve highlight on hover enter/leave."""
         commands: list[ViewerCommand] = []
         if tag:
             tag_str = str(tag)
@@ -204,6 +231,7 @@ class CADAdapter:
         return commands
 
     def _handle_curve_selected(self, tag: str) -> list[ViewerCommand]:
+        """Enter edit mode for the selected CAD curve."""
         return [
             {"cmd": "set_edit_mode", "enabled": True, "curve_tag": tag},
             {"cmd": "set_active_curve", "curve_tag": tag},
@@ -213,14 +241,13 @@ class CADAdapter:
             },
         ]
 
-    def _handle_cp_pick_end(self, event: ViewEvent) -> list[ViewerCommand]:
-        # CAD linear segments do not support control-point editing in v1.
-        self._resolve_cad_tag(event)
-        return []
-
 
 class SplineAdapter:
-    """Anti-Corruption Layer for ferrispline-backed spline curves."""
+    """
+    Adapter bridging a SplineModel to the Viewer IPC layer.
+
+    It handles the discretization of splines and the manipulation of control points.
+    """
 
     _SAMPLE_COUNT = 100
 
@@ -230,18 +257,22 @@ class SplineAdapter:
         self._model.add_observer(self)
 
     def bind_update(self, callback: Callable[[ScenePayload], None]) -> None:
+        """Register a callback invoked when the spline model changes."""
         self._update_callback = callback
 
     def unbind_update(self) -> None:
+        """Clear the update callback."""
         self._update_callback = None
 
     def get_delta_load(self) -> ScenePayload:
+        """Build the initial add payload with all spline curves."""
         return {
             "op": "add",
             "changed_curves": self._build_all_spline_curves(),
         }
 
     def handle_event(self, event: ViewEvent) -> list[ViewerCommand]:
+        """Dispatch selection and control-point drag events for spline curves."""
         event_type = event.get("event_type", "")
         local_id = self._resolve_spline_tag(event)
         if local_id is None:
@@ -249,13 +280,16 @@ class SplineAdapter:
 
         ns_tag = encode(SPLINE_NS, local_id)
 
-        if event_type == "curve_selected":
-            return self._handle_curve_selected(ns_tag)
-        if event_type == "cp_pick_end":
-            return self._handle_cp_pick_end(event, local_id)
-        return []
+        match event_type:
+            case "curve_selected":
+                return self._handle_curve_selected(ns_tag)
+            case "cp_pick_end":
+                return self._handle_cp_pick_end(event, local_id)
+            case _:
+                return []
 
     def update(self, _model: SplineModel) -> None:
+        """Observer callback: push an update delta when the model changes."""
         if self._update_callback is not None:
             self._update_callback(
                 {
@@ -265,6 +299,7 @@ class SplineAdapter:
             )
 
     def _resolve_spline_tag(self, event: ViewEvent) -> str | None:
+        """Extract and validate the spline local curve id from an event."""
         raw = event.get("curve_tag") or event.get("tag")
         if raw is None:
             return None
@@ -280,6 +315,7 @@ class SplineAdapter:
         return local_id
 
     def _build_all_spline_curves(self) -> dict[str, CurveDelta]:
+        """Build render deltas for every spline in the model."""
         curves: dict[str, CurveDelta] = {}
         for local_id in self._model.curves:
             delta = self._build_spline_curve(local_id)
@@ -288,6 +324,7 @@ class SplineAdapter:
         return curves
 
     def _build_spline_curve(self, local_id: str) -> CurveDelta | None:
+        """Discretize one spline into a namespaced render delta."""
         try:
             control_points = self._model.get_control_points(local_id)
             curve_points = self._model._evaluate(local_id, self._SAMPLE_COUNT)
@@ -305,6 +342,7 @@ class SplineAdapter:
             return None
 
     def _handle_curve_selected(self, ns_tag: str) -> list[ViewerCommand]:
+        """Enter edit mode for the selected spline curve."""
         return [
             {"cmd": "set_edit_mode", "enabled": True, "curve_tag": ns_tag},
             {"cmd": "set_active_curve", "curve_tag": ns_tag},
@@ -317,6 +355,7 @@ class SplineAdapter:
     def _handle_cp_pick_end(
         self, event: ViewEvent, local_id: str
     ) -> list[ViewerCommand]:
+        """Apply a control-point drag to the spline model."""
         cp_index = int(event.get("cp_index", -1))
         world_pos = event.get("world_pos")
         if world_pos is None:
@@ -329,7 +368,11 @@ class SplineAdapter:
 
 
 class CompositeViewable:
-    """Aggregates adapters and routes events by tag namespace prefix."""
+    """
+    Aggregator for multiple IViewable adapters (e.g., CAD and Spline).
+
+    It routes events to the correct adapter based on tag namespaces.
+    """
 
     def __init__(self, adapters: dict[str, IViewable]):
         self._adapters = adapters
@@ -339,12 +382,14 @@ class CompositeViewable:
     def from_models(
         cls, cad_model: CADModel, spline_model: SplineModel | None = None
     ) -> CompositeViewable:
+        """Construct a composite viewable from CAD and optional spline models."""
         adapters: dict[str, IViewable] = {"cad": CADAdapter(cad_model)}
         if spline_model is not None:
             adapters["spline"] = SplineAdapter(spline_model)
         return cls(adapters)
 
     def bind_update(self, callback: Callable[[ScenePayload], None]) -> None:
+        """Fan in update callbacks from all child adapters."""
         self._update_callback = callback
 
         def _fan_in(payload: ScenePayload) -> None:
@@ -355,15 +400,18 @@ class CompositeViewable:
             adapter.bind_update(_fan_in)
 
     def unbind_update(self) -> None:
+        """Clear the update callback on this composite and all adapters."""
         self._update_callback = None
         for adapter in self._adapters.values():
             adapter.unbind_update()
 
     def get_delta_load(self) -> ScenePayload:
+        """Merge initial-load payloads from all adapters."""
         payloads = [adapter.get_delta_load() for adapter in self._adapters.values()]
         return merge_deltas(*payloads)
 
     def handle_event(self, event: ViewEvent) -> list[ViewerCommand]:
+        """Route an event to the adapter matching the tag namespace."""
         tag = event.get("curve_tag") or event.get("tag")
         if tag is not None and is_namespaced(str(tag)):
             ns = prefix(str(tag))

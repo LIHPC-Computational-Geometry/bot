@@ -106,8 +106,6 @@ class ViewerApp(ShowBase):
                     self.update_scene(data)
                 elif cmd == "delete":
                     self.delete_in_scene(data)
-                elif cmd == "load":
-                    self.load_scene(data)
                 elif cmd == "reload_config":
                     self._config = data
                     if self._scene:
