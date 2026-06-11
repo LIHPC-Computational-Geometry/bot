@@ -87,7 +87,7 @@ def merge_deltas(*payloads: ScenePayload) -> ScenePayload:
         if "edges" in payload:
             edges = payload["edges"]
 
-    result: ScenePayload = {"op": op, "changed_curves": merged_curves}  # type: ignore[typeddict-item]
+    result: ScenePayload = {"op": op, "changed_curves": merged_curves}
     if deleted:
         result["deleted_curves"] = deleted
     if bounds is not None:
@@ -130,13 +130,13 @@ def curve_delta_to_curve_info(tag: str, delta: CurveDelta) -> dict[str, Any]:
     return info
 
 
-def payload_to_geom_data(payload: ScenePayload) -> dict[str, Any]:
+def payload_to_geom_data(payload: ScenePayload) -> ScenePayload:
     """Convert a load ScenePayload into legacy geom_data for Scene construction."""
-    curves: dict[str, Any] = {}
+    curves: ScenePayload = {}
     for tag, delta in payload.get("changed_curves", {}).items():
         curves[str(tag)] = curve_delta_to_curve_info(str(tag), delta)
 
-    geom_data: dict[str, Any] = {
+    geom_data: ScenePayload = {
         "curves": curves,
         "bounds": payload.get("bounds", {}),
     }

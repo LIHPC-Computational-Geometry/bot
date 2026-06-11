@@ -12,6 +12,7 @@ from bot.viewer.serialize import payload_to_geom_data
 from bot.control.camera import CameraController
 from bot.control.mouse import MouseHandler
 from bot.control.keyboard import KeyboardHandler
+from bot.viewer.contracts import ScenePayload
 
 _DEFAULT_SCENE = {
     "background_color": [0.1, 0.1, 0.12],
@@ -104,7 +105,7 @@ class ViewerApp(ShowBase):
                 elif cmd == "update":
                     self.update_scene(data)
                 elif cmd == "delete":
-                    self.delete_scene(data)
+                    self.delete_in_scene(data)
                 elif cmd == "load":
                     self.load_scene(data)
                 elif cmd == "reload_config":
@@ -189,12 +190,12 @@ class ViewerApp(ShowBase):
             return
 
         if isinstance(payload, dict) and "changed_curves" in payload:
-            self._scene.apply_patch(payload)  # type: ignore[arg-type]
+            self._scene.apply_patch(payload)
             return
 
         self._scene.rebuild(payload)
 
-    def delete_scene(self, payload: dict):
+    def delete_in_scene(self, payload: ScenePayload):
         """Remove curves listed in a delete payload."""
         if self._scene is None:
             return
