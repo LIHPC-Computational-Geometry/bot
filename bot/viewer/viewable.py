@@ -75,8 +75,8 @@ class CADAdapter:
 
     def get_delta_load(self) -> ScenePayload:
         """Build the initial add payload with curves, bounds, and flat topology."""
-        changed_curves = self._build_changed_curves()
-        flat_points, flat_edges = self._build_flat_topology(changed_curves)
+        changed_curves = self.__build_changed_curves()
+        flat_points, flat_edges = self.__build_flat_topology(changed_curves)
         payload: ScenePayload = {
             "op": "add",
             "changed_curves": changed_curves,
@@ -97,11 +97,11 @@ class CADAdapter:
 
         match event_type:
             case "hover":
-                return self._handle_hover(tag)
+                return self.__handle_hover(tag)
             case "curve_selected":
-                if tag is None or self._resolve_cad_tag_str(str(tag)) is None:
+                if tag is None or self.__resolve_cad_tag_str(str(tag)) is None:
                     return []
-                return self._handle_curve_selected(str(tag))
+                return self.__handle_curve_selected(str(tag))
             case "pick" if event.get("world_pos") is None:
                 try:
                     self._model.add_point(list(event["world_pos"]))
@@ -117,18 +117,18 @@ class CADAdapter:
             self._update_callback(
                 {
                     "op": "update",
-                    "changed_curves": self._build_changed_curves(),
+                    "changed_curves": self.__build_changed_curves(),
                 }
             )
 
-    def _resolve_cad_tag(self, event: ViewEvent) -> int | None:
+    def __resolve_cad_tag(self, event: ViewEvent) -> int | None:
         """Extract and validate the CAD local curve id from an event."""
         raw = event.get("curve_tag") or event.get("tag")
         if raw is None:
             return None
-        return self._resolve_cad_tag_str(str(raw))
+        return self.__resolve_cad_tag_str(str(raw))
 
-    def _resolve_cad_tag_str(self, tag_str: str) -> int | None:
+    def __resolve_cad_tag_str(self, tag_str: str) -> int | None:
         """Return the CAD local id for a namespaced tag, or None if invalid."""
         if not is_namespaced(tag_str):
             return None
@@ -140,7 +140,7 @@ class CADAdapter:
             return None
         return local_id
 
-    def _build_changed_curves(self) -> dict[str, CurveDelta]:
+    def __build_changed_curves(self) -> dict[str, CurveDelta]:
         """Discretize all CAD curves into namespaced render deltas."""
         changed: dict[str, CurveDelta] = {}
         try:
@@ -158,7 +158,7 @@ class CADAdapter:
             _logger.warning("CADAdapter failed to build curves: %s", exc)
         return changed
 
-    def _build_flat_topology(
+    def __build_flat_topology(
         self, changed_curves: dict[str, CurveDelta]
     ) -> tuple[list[list[float]], list[tuple[int, int, str]]]:
         """Flatten per-curve geometry into a single point list and edge index."""
@@ -176,7 +176,7 @@ class CADAdapter:
                 flat_edges.append((offset + idx_a, offset + idx_b, str(tag)))
         return flat_points, flat_edges
 
-    def _handle_hover(self, tag: str | None) -> list[ViewerCommand]:
+    def __handle_hover(self, tag: str | None) -> list[ViewerCommand]:
         """Update HUD text and curve highlight on hover enter/leave."""
         commands: list[ViewerCommand] = []
         if tag:
@@ -191,7 +191,7 @@ class CADAdapter:
                 )
 
             info_text = f"--- Curve {tag_str} ---\n"
-            local_id = self._resolve_cad_tag_str(tag_str)
+            local_id = self.__resolve_cad_tag_str(tag_str)
             if local_id is not None:
                 try:
                     coords_a, coords_b = self._model.get_end_points_coords(local_id)
@@ -230,7 +230,7 @@ class CADAdapter:
                 self._last_hovered = None
         return commands
 
-    def _handle_curve_selected(self, tag: str) -> list[ViewerCommand]:
+    def __handle_curve_selected(self, tag: str) -> list[ViewerCommand]:
         """Enter edit mode for the selected CAD curve."""
         return [
             {"cmd": "set_edit_mode", "enabled": True, "curve_tag": tag},
@@ -268,13 +268,13 @@ class SplineAdapter:
         """Build the initial add payload with all spline curves."""
         return {
             "op": "add",
-            "changed_curves": self._build_all_spline_curves(),
+            "changed_curves": self.__build_all_spline_curves(),
         }
 
     def handle_event(self, event: ViewEvent) -> list[ViewerCommand]:
         """Dispatch selection and control-point drag events for spline curves."""
         event_type = event.get("event_type", "")
-        local_id = self._resolve_spline_tag(event)
+        local_id = self.__resolve_spline_tag(event)
         if local_id is None:
             return []
 
@@ -282,9 +282,9 @@ class SplineAdapter:
 
         match event_type:
             case "curve_selected":
-                return self._handle_curve_selected(ns_tag)
+                return self.__handle_curve_selected(ns_tag)
             case "cp_pick_end":
-                return self._handle_cp_pick_end(event, local_id)
+                return self.__handle_cp_pick_end(event, local_id)
             case _:
                 return []
 
@@ -294,11 +294,11 @@ class SplineAdapter:
             self._update_callback(
                 {
                     "op": "update",
-                    "changed_curves": self._build_all_spline_curves(),
+                    "changed_curves": self.__build_all_spline_curves(),
                 }
             )
 
-    def _resolve_spline_tag(self, event: ViewEvent) -> str | None:
+    def __resolve_spline_tag(self, event: ViewEvent) -> str | None:
         """Extract and validate the spline local curve id from an event."""
         raw = event.get("curve_tag") or event.get("tag")
         if raw is None:
@@ -314,16 +314,16 @@ class SplineAdapter:
             return None
         return local_id
 
-    def _build_all_spline_curves(self) -> dict[str, CurveDelta]:
+    def __build_all_spline_curves(self) -> dict[str, CurveDelta]:
         """Build render deltas for every spline in the model."""
         curves: dict[str, CurveDelta] = {}
         for local_id in self._model.curves:
-            delta = self._build_spline_curve(local_id)
+            delta = self.__build_spline_curve(local_id)
             if delta is not None:
                 curves[encode(SPLINE_NS, local_id)] = delta
         return curves
 
-    def _build_spline_curve(self, local_id: str) -> CurveDelta | None:
+    def __build_spline_curve(self, local_id: str) -> CurveDelta | None:
         """Discretize one spline into a namespaced render delta."""
         try:
             control_points = self._model.get_control_points(local_id)
@@ -341,7 +341,7 @@ class SplineAdapter:
             _logger.warning("SplineAdapter failed to build curve %s: %s", local_id, exc)
             return None
 
-    def _handle_curve_selected(self, ns_tag: str) -> list[ViewerCommand]:
+    def __handle_curve_selected(self, ns_tag: str) -> list[ViewerCommand]:
         """Enter edit mode for the selected spline curve."""
         return [
             {"cmd": "set_edit_mode", "enabled": True, "curve_tag": ns_tag},
@@ -352,7 +352,7 @@ class SplineAdapter:
             },
         ]
 
-    def _handle_cp_pick_end(
+    def __handle_cp_pick_end(
         self, event: ViewEvent, local_id: str
     ) -> list[ViewerCommand]:
         """Apply a control-point drag to the spline model."""

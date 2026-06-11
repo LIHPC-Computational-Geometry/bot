@@ -41,28 +41,28 @@ class TestViewerConnect(unittest.TestCase):
     def test_connect_binds_viewable(self):
         viewer = self._make_viewer()
         viewable = _FakeViewable()
-        viewer.connect(viewable)
+        viewer._connect(viewable)
         self.assertTrue(viewable.bound)
         self.assertIs(viewer._viewable, viewable)
 
     def test_connect_returns_self_for_chaining(self):
         viewer = self._make_viewer()
-        result = viewer.connect(_FakeViewable())
+        result = viewer._connect(_FakeViewable())
         self.assertIs(result, viewer)
 
     def test_connect_replaces_previous_viewable(self):
         viewer = self._make_viewer()
         v1 = _FakeViewable()
         v2 = _FakeViewable()
-        viewer.connect(v1)
-        viewer.connect(v2)
+        viewer._connect(v1)
+        viewer._connect(v2)
         self.assertTrue(v1.unbound)
         self.assertIs(viewer._viewable, v2)
 
     def test_connect_sends_add_when_pipe_open(self):
         viewer = self._make_viewer()
         viewer._conn = MagicMock()
-        viewer.connect(_FakeViewable())
+        viewer._connect(_FakeViewable())
         viewer._conn.send.assert_called_with(
             ("add", {"op": "add", "changed_curves": {}})
         )
@@ -77,14 +77,14 @@ class TestViewerDisconnect(unittest.TestCase):
     def test_disconnect_unbinds_viewable(self):
         viewer = self._make_viewer()
         viewable = _FakeViewable()
-        viewer.connect(viewable)
+        viewer._connect(viewable)
         viewer.disconnect()
         self.assertTrue(viewable.unbound)
         self.assertIsNone(viewer._viewable)
 
     def test_disconnect_returns_self_for_chaining(self):
         viewer = self._make_viewer()
-        viewer.connect(_FakeViewable())
+        viewer._connect(_FakeViewable())
         result = viewer.disconnect()
         self.assertIs(result, viewer)
 

@@ -85,7 +85,7 @@ class TestViewerSubprocessLifecycle(unittest.TestCase):
 @pytest.mark.skipif(not _has_display(), reason="no display available")
 class TestViewerIPCWithModel(unittest.TestCase):
     """
-    Load a .geo file, connect a real Viewer and verify the model mutation
+    Load a .geo file, _connect a real Viewer and verify the model mutation
     path reaches the subprocess pipe without errors.
     """
 

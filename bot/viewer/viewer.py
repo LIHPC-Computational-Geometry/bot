@@ -143,7 +143,7 @@ class Viewer:
         """Convenience wrapper that builds a CompositeViewable from core models."""
 
         if spline_model is None:
-            return self.connect(CompositeViewable({"cad": CADAdapter(cad_model)}))
+            return self._connect(CompositeViewable({"cad": CADAdapter(cad_model)}))
         return self._connect(CompositeViewable.from_models(cad_model, spline_model))
 
     def disconnect(self) -> "Viewer":

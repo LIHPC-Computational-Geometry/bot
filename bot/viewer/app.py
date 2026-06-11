@@ -54,20 +54,20 @@ class ViewerApp(ShowBase):
         self._scene = None
         self._camera_controller = None
 
-        self._config = self._load_config(config_filename)
+        self._config = self.__load_config(config_filename)
 
         self.kb_handler = KeyboardHandler(self)
         self.mouse_handler = MouseHandler(self)
         self.axis_constraint_mask = 7
-        self.accept("cmd_axis_constraint", self._on_axis_constraint_cmd)
+        self.accept("cmd_axis_constraint", self.__on_axis_constraint_cmd)
 
         self.hud = OnscreenText(
             text="", pos=(-1.3, -0.5), scale=0.06, fg=(1, 1, 1, 1), align=TextNode.ALeft
         )
 
-        self.taskMgr.add(self._process_commands, "ViewerProcessCommands")
+        self.taskMgr.add(self.__process_commands, "ViewerProcessCommands")
 
-    def _load_config(self, config_filename: str) -> dict:
+    def __load_config(self, config_filename: str) -> dict:
         """Load and parse the TOML config file. Returns an empty dict if not found."""
         base_dir = os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -78,17 +78,17 @@ class ViewerApp(ShowBase):
                 return tomllib.load(f)
         return {}
 
-    def _scene_cfg(self) -> dict:
+    def __scene_cfg(self) -> dict:
         """Return the ``[view.scene]`` section of the config, or built-in defaults."""
         return self._config.get("view", {}).get("scene", _DEFAULT_SCENE)
 
-    def _camera_cfg(self) -> dict:
+    def __camera_cfg(self) -> dict:
         """Return the ``[view.camera]`` section merged with built-in defaults."""
         cfg = _DEFAULT_CAMERA.copy()
         cfg.update(self._config.get("view", {}).get("camera", {}))
         return cfg
 
-    def _process_commands(self, task):
+    def __process_commands(self, task):
         """
         Per-frame task: drain the command queue and dispatch each command.
 
@@ -101,17 +101,17 @@ class ViewerApp(ShowBase):
             try:
                 cmd, data = self._cmd_queue.get_nowait()
                 if cmd == "add":
-                    self.load_scene(data)
+                    self.__load_scene(data)
                 elif cmd == "update":
-                    self.update_scene(data)
+                    self.__update_scene(data)
                 elif cmd == "delete":
-                    self.delete_in_scene(data)
+                    self.__delete_in_scene(data)
                 elif cmd == "reload_config":
                     self._config = data
                     if self._scene:
-                        self._scene.apply_settings(self._scene_cfg())
+                        self._scene.apply_settings(self.__scene_cfg())
                     if self._camera_controller:
-                        self._camera_controller.apply_settings(self._camera_cfg())
+                        self._camera_controller.apply_settings(self.__camera_cfg())
                 elif cmd == "highlight_curve":
                     if self._scene:
                         self._scene.set_curve_color(data["tag"], data["color"])
@@ -133,12 +133,12 @@ class ViewerApp(ShowBase):
                     if self._scene:
                         self._scene.set_active_curve(curve_tag)
                 elif cmd == "set_axis_constraint":
-                    self._set_axis_constraint(data.get("mask", 7))
+                    self.__set_axis_constraint(data.get("mask", 7))
             except queue.Empty:
                 break
         return task.cont
 
-    def _set_axis_constraint(self, mask: int):
+    def __set_axis_constraint(self, mask: int):
         try:
             raw_mask = int(mask)
         except TypeError, ValueError:
@@ -152,10 +152,10 @@ class ViewerApp(ShowBase):
             self._scene.set_axis_constraint(self.axis_constraint_mask)
         self.hud.setText(f"Axis constraint mask: {self.axis_constraint_mask}")
 
-    def _on_axis_constraint_cmd(self, mask: int):
-        self._set_axis_constraint(mask)
+    def __on_axis_constraint_cmd(self, mask: int):
+        self.__set_axis_constraint(mask)
 
-    def load_scene(self, payload: dict):
+    def __load_scene(self, payload: dict):
         """Load (or reload) the scene from an add payload or legacy geom_data."""
         if self._scene is not None:
             self._scene.clear()
@@ -165,22 +165,22 @@ class ViewerApp(ShowBase):
         else:
             geom_data = payload
 
-        self._scene = Scene(self, geom_data, self._scene_cfg())
+        self._scene = Scene(self, geom_data, self.__scene_cfg())
         self._scene.set_axis_constraint(self.axis_constraint_mask)
 
         if self._camera_controller is None:
             self._camera_controller = CameraController(
-                self, self._scene, self._camera_cfg()
+                self, self._scene, self.__camera_cfg()
             )
         else:
             self._camera_controller.scene = self._scene
 
         self._camera_controller.recenter()
 
-    def update_scene(self, payload: dict):
+    def __update_scene(self, payload: dict):
         """Apply an update payload or rebuild from legacy geom_data."""
         if self._scene is None:
-            self.load_scene(payload)
+            self.__load_scene(payload)
             return
 
         if isinstance(payload, dict) and payload.get("op") == "update":
@@ -193,7 +193,7 @@ class ViewerApp(ShowBase):
 
         self._scene.rebuild(payload)
 
-    def delete_in_scene(self, payload: ScenePayload):
+    def __delete_in_scene(self, payload: ScenePayload):
         """Remove curves listed in a delete payload."""
         if self._scene is None:
             return
