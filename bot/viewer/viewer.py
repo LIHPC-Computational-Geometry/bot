@@ -117,6 +117,10 @@ class Viewer:
         if self._viewable is not None:
             self._viewable.unbind_update()
             self._viewable = None
+
+        if hasattr(self, "_default_event_handler"):
+            delattr(self, "_default_event_handler")
+
         return self
 
     def run(self) -> "Viewer":
@@ -171,7 +175,9 @@ class Viewer:
         self._event_thread = None
         print("Stopped Viewer")
 
-    def add_callback(self, event_type: ViewEventType, callback: VisualCallback) -> "Viewer":
+    def add_callback(
+        self, event_type: ViewEventType, callback: VisualCallback
+    ) -> "Viewer":
         """Associate a personalized function for a specific event."""
         self._callbacks[event_type] = callback
         return self
@@ -226,7 +232,9 @@ class Viewer:
         self._send(SceneUpdateOp.DELETE, payload)
         return self
 
-    def move_control_point(self, curve_tag: str, cp_index: int, new_pos: list[float]):
+    def move_control_point(
+        self, curve_tag: str, cp_index: int, new_pos: list[float]
+    ) -> "Viewer":
         """Move a control point via the viewable event path from IPython."""
         if self._viewable is None:
             self.set_hud_text("No viewable connected.")
@@ -240,6 +248,7 @@ class Viewer:
         }
         self._dispatch_commands(self._viewable.handle_event(event))
         self.set_hud_text(f"Control point {cp_index} of curve {curve_tag} moved.")
+        return self
 
     # =========================================================================
     # INTERNAL FUNCTIONS
@@ -253,11 +262,30 @@ class Viewer:
         """
         if self._viewable is not None:
             self.disconnect()
+
         self._viewable = viewable
         viewable.bind_update(self._on_delta)
+
+        self._default_event_handler = self._create_default_handler(viewable)
+
         if self._conn is not None:
             self._send(SceneUpdateOp.ADD, viewable.get_delta_load())
         return self
+
+    def _create_default_handler(
+        self, viewable: "IViewable"
+    ) -> Callable[[ViewEventType, Any], None]:
+        """Create a closure for translate event into visual commands."""
+
+        def handler(event_type: ViewEventType, data: Any):
+            # 1. Format event
+            view_event = self._build_view_event(event_type, data)
+            # 2. The adapter choose commands to apply
+            commands = viewable.handle_event(view_event)
+            # 3. The Viewer send these commands to the child process
+            self._dispatch_commands(commands)
+
+        return handler
 
     def _on_delta(self, payload: "ScenePayload") -> None:
         """Forward adapter deltas to the child process."""
@@ -275,19 +303,23 @@ class Viewer:
     def _dispatch_commands(self, commands: list["ViewerCommand"]) -> None:
         for command in commands:
             cmd = command.get("cmd")
-            if cmd == ViewerCommandType.HIGHLIGHT_CURVE:
-                self.highlight_curve(command["tag"], command.get("color", [1, 1, 1, 1]))
-            elif cmd == ViewerCommandType.UPDATE_HUD:
-                self.set_hud_text(command.get("text", ""))
-            elif cmd == ViewerCommandType.SET_EDIT_MODE:
-                self.set_edit_mode(
-                    bool(command.get("enabled", False)),
-                    command.get("curve_tag"),
-                )
-            elif cmd == ViewerCommandType.SET_ACTIVE_CURVE:
-                self.set_active_curve(command.get("curve_tag"))
-            elif cmd == ViewerCommandType.SET_AXIS_CONSTRAINT:
-                self.set_axis_constraint(command.get("mask", 7))
+            match cmd:
+                case ViewerCommandType.HIGHLIGHT_CURVE:
+                    self.highlight_curve(
+                        command["tag"], command.get("color", [1, 1, 1, 1])
+                    )
+                case ViewerCommandType.UPDATE_HUD:
+                    self.set_hud_text(command.get("text", ""))
+                case ViewerCommandType.SET_EDIT_MODE:
+                    self.set_edit_mode(
+                        bool(command.get("enabled", False)), command.get("curve_tag")
+                    )
+                case ViewerCommandType.SET_ACTIVE_CURVE:
+                    self.set_active_curve(command.get("curve_tag"))
+                case ViewerCommandType.SET_AXIS_CONSTRAINT:
+                    self.set_axis_constraint(command.get("mask", 7))
+                case _:
+                    pass
 
     def _start_event_listener(self):
         """Daemon thread that receives events from the subprocess."""
@@ -295,35 +327,28 @@ class Viewer:
         def _listen():
             while self._running:
                 try:
-                    # On attend un message, on passe à la suite si rien n'arrive
                     if not self._conn.poll(0.1):
                         continue
 
                     event_type, data = self._conn.recv()
 
-                    # 1. Maintien de l'état interne de base
                     if event_type == ViewEventType.HOVER:
                         self._last_hovered = str(data) if data is not None else None
 
-                    # 2. Priorité au comportement utilisateur (Callback)
-                    if event_type in self._callbacks and self._callbacks[event_type] is not None:
+                    # NOTE: personalized callback
+                    if (
+                        event_type in self._callbacks
+                        and self._callbacks[event_type] is not None
+                    ):
                         self._callbacks[event_type](data)
-                        continue  # On arrête ici, on a surchargé le comportement par défaut
 
-                    # 3. Comportement par défaut (Adaptateurs CAO/Spline)
-                    if self._viewable is not None:
-                        # On formate pour l'adaptateur
-                        view_event = self._build_view_event(event_type, data)
+                    # NOTE: execute default behavior event though a personalized callback is used
+                    if hasattr(self, "_default_event_handler"):
+                        self._default_event_handler(event_type, data)
 
-                        # L'adaptateur décide de ce qu'il faut afficher
-                        commands = self._viewable.handle_event(view_event)
-
-                        # Le Viewer envoie les ordres (HUD, couleurs...) au processus 3D
-                        self._dispatch_commands(commands)
-
-                except (EOFError, BrokenPipeError, AttributeError):
+                except EOFError, BrokenPipeError, AttributeError:
                     break
-                except Exception as e:
+                except Exception:
                     pass
 
         self._event_thread = threading.Thread(target=_listen, daemon=True)
