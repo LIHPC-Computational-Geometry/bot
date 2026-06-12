@@ -278,9 +278,9 @@ class Scene:
             curve.apply_geometry_bytes(
                 geometry["curve_vertices"], delta["vertex_count"]
             )
-            control_vertices = geometry.get("control_vertices")
-            if control_vertices is not None and delta.get("cp_count"):
-                curve.apply_control_vertices_bytes(control_vertices, delta["cp_count"])
+            cp_vertices = geometry.get("cp_vertices")
+            if cp_vertices is not None and delta.get("cp_count"):
+                curve.apply_control_vertices_bytes(cp_vertices, delta["cp_count"])
 
     def remove_curves(self, tags: list[str]) -> None:
         """Remove curves identified by namespaced tags."""

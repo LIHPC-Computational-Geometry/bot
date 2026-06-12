@@ -38,7 +38,7 @@ def pack_curve_geometry(
     """Build a CurveGeometry dict with float32 byte channels."""
     geometry: CurveGeometry = {"curve_vertices": floats_to_bytes(curve_points)}
     if control_points is not None and len(control_points) > 0:
-        geometry["control_vertices"] = floats_to_bytes(control_points)
+        geometry["cp_vertices"] = floats_to_bytes(control_points)
     return geometry
 
 
@@ -120,11 +120,9 @@ def curve_delta_to_curve_info(tag: str, delta: CurveDelta) -> dict[str, Any]:
         "edges": edges,
         "type": delta["type"],
     }
-    control_vertices = delta["geometry"].get("control_vertices")
-    if control_vertices is not None and delta.get("cp_count"):
-        info["control_points"] = bytes_to_point_list(
-            control_vertices, delta["cp_count"]
-        )
+    cp_vertices = delta["geometry"].get("cp_vertices")
+    if cp_vertices is not None and delta.get("cp_count"):
+        info["control_points"] = bytes_to_point_list(cp_vertices, delta["cp_count"])
     if "degree" in delta:
         info["degree"] = delta["degree"]
     return info

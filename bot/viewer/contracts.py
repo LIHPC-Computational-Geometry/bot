@@ -80,31 +80,51 @@ ChildMessage = tuple[ViewEventType, Any]
 class CurveGeometry(TypedDict):
     """Binary geometry channels for a single curve."""
 
-    curve_vertices: bytes
-    control_vertices: NotRequired[bytes]
+    curve_vertices: bytes  # Flat float32 byte array of xyz coordinates for the evaluated curve points.
+    cp_vertices: NotRequired[
+        bytes
+    ]  # Flat float32 byte array of xyz coordinates for the control points.
 
 
 class CurveDelta(TypedDict):
     """Per-curve render delta sent over the IPC pipe."""
 
-    type: Literal["linear", BEZIER_TYP, NURBS_TYP]
-    geometry: CurveGeometry
-    vertex_count: int
-    edges: list[tuple[int, int]] | None
+    type: Literal["linear", BEZIER_TYP, NURBS_TYP]  # Mathematical type of the curve.
+    geometry: (
+        CurveGeometry  # The binary vertex data for the curve and its control points.
+    )
+    vertex_count: int  # Number of 3D vertices encoded in `geometry["curve_vertices"]`.
+    edges: (
+        list[tuple[int, int]] | None
+    )  # Point connectivity indices (idx_a, idx_b) to form line segments.
 
-    degree: NotRequired[int]
-    cp_count: NotRequired[int]
+    degree: NotRequired[
+        int
+    ]  # Mathematical degree of the spline (e.g., 3 for cubic Bézier/NURBS).
+    cp_count: NotRequired[
+        int
+    ]  # Number of 3D control points encoded in `geometry["cp_vertices"]`.
 
 
 class ScenePayload(TypedDict):
     """Universal exchange format for incremental scene updates."""
 
-    op: SceneUpdateOp
-    changed_curves: dict[str, CurveDelta]
-    deleted_curves: NotRequired[list[str]]
-    bounds: NotRequired[dict[str, Any]]
-    points: NotRequired[bytes]
-    edges: NotRequired[list[tuple[int, int, str]]]
+    op: SceneUpdateOp  # The type of operation (ADD, UPDATE, or DELETE).
+    changed_curves: dict[
+        str, CurveDelta
+    ]  # Mapping of namespaced curve tags (e.g., "cad:1") to their update delta.
+    deleted_curves: NotRequired[
+        list[str]
+    ]  # List of namespaced tags for curves that should be removed.
+    bounds: NotRequired[
+        dict[str, Any]
+    ]  # Global scene bounding box dimensions (min, max, center, size).
+    points: NotRequired[
+        bytes
+    ]  # Flat float32 byte array of xyz coordinates for all CAD nodes (load-only).
+    edges: NotRequired[
+        list[tuple[int, int, str]]
+    ]  # Flat list of all scene edges (idx_a, idx_b, tag) (load-only).
 
 
 class EventHover(TypedDict):
