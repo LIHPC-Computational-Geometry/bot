@@ -1,60 +1,86 @@
-# Contributing to Bot Project 
+# Contributing to Bot Project
 
 This section is here to explain how to contribute to this project.
 
-## 📜 Code of Conduct
-By participating in this project, you agree to abide by our code of conduct: be respectful, professional, and collaborative.
+## Code of Conduct
 
-## 🛠 Development Workflow
+By participating in this project, you agree to remain respectful, professional, and collaborative.
 
-### 1. Environment Setup
-We use `uv` for all dependency management. To set up your environment:
+## Development Workflow
+
+### 1. Environment setup
+
+We use `uv` for dependency management.
+
 ```bash
 git checkout -b feature/your-feature-name
-uv sync
+uv sync --all-extras --dev
 ```
-  
-###  2. Coding Standards
-- **Formatting:** We follow standard Python conventions. Please ensure your code is clean and readable.
-- **Docstrings:** All new functions and classes must include docstrings in Google Style.
-- **Type Hints:** Use Python type hints wherever possible to improve maintainability.
 
-### 3. Testing Requirements
-- No contribution will be merged without passing tests.
-- Add tests for any new feature in the `tests/` directory.
-- Ensure your changes do not break existing tests.
-- Always run the test suite locally before pushing. In the project root dir, run:
+If submodules are not initialized yet:
+
+```bash
+git submodule update --init --recursive
+```
+
+### 2. Coding standards
+
+- **Formatting:** follow standard Python conventions.
+- **Docstrings:** add English docstrings for new public classes/functions (Google style preferred).
+- **Type hints:** use type hints for new public interfaces.
+
+### 3. Testing requirements
+
+- No contribution is merged without passing tests.
+- Add tests for new behavior in `tests/`.
+- Ensure existing tests still pass before pushing.
+
 ```bash
 uv run pytest
 ```
 
-### 4. Git Branching & Commits
+Useful subsets:
 
-- Branches: Use descriptive names like feature/abc, fix/xyz, or docs/update-readme.
+```bash
+uv run pytest tests/unit/
+uv run pytest tests/system/
+```
 
-- Commits: Try to use Conventional Commits (e.g., feat: add new mesh generator, fix: resolve libGLU path issue).
+### 4. Git branching and commits
 
-### 🚀 Pull Request Process
-1. Update the `README.md` or documentation if you changed the API.
+- Branch names: `feature/...`, `fix/...`, `docs/...`, `refactor/...`, `test/...`
+- Commit style: Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `perf:`)
 
-2. Ensure the CI pipeline (GitHub Actions) passes on your PR.
+### Pull request process
 
-3. A maintainer will review your changes and provide feedback.
+1. Update documentation when API or behavior changes.
+2. Ensure GitHub Actions CI is green.
+3. Open a PR with clear change motivation and impact.
+4. A maintainer reviews and provides feedback.
 
-#u# 🛠 Troubleshooting for Contributors
+## Documentation references
 
-### Graphics Issues (Panda3D/Gmsh)
+- Developer index: [doc/index.md](doc/index.md)
+- Canonical technical reference: [doc/technical_reference_v1.md](doc/technical_reference_v1.md)
+- Focused guides:
+  - [doc/architecture.md](doc/architecture.md)
+  - [doc/callbacks.md](doc/callbacks.md)
+  - [doc/custom_model.md](doc/custom_model.md)
 
-If you are working on a headless Linux server and encounter libGLU errors, ensure you have the system dependencies installed:
+## Troubleshooting
 
-```Bash
+### Graphics issues (Panda3D/Gmsh)
+
+If you are on a headless Linux server and encounter OpenGL issues:
+
+```bash
 sudo apt-get install libglu1-mesa libosmesa6
 ```
 
-### Continuous Integration
+### Continuous integration
 
-Your PR will be automatically tested for:
-- **Linting & Logic:** via `pytest`.
-- **Coverage:** Coverage must not decrease significantly.
+PRs are automatically checked for:
 
-- **Documentation:** `pdoc` must be able to build the docs without errors.
+- Tests and logic (`tests.yml`)
+- Lint/format checks (`lint.yml`)
+- Coverage reporting

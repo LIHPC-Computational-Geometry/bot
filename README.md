@@ -25,34 +25,30 @@ The project combines a [gmsh](https://gmsh.info/)-based CAD model with a real-ti
 
 BOT provides a programmable environment where you can:
 
-- Load CAD geometry (`.geo`, `.step`, …) via gmsh/OpenCASCADE.
-- Query and mutate the geometry programmatically (add points, query adjacencies, …).
-- Visualise the model live in a 3D viewer.
-- Pick locations in the viewport and feed them back to the model.
+- Load CAD geometry (`.geo`, `.step`, ...) via gmsh/OpenCASCADE.
+- Query and mutate CAD entities (points, curves, adjacency).
+- Create and edit spline curves (Bezier/NURBS) through FerriSpline.
+- Visualise both CAD and spline geometry in a live 3D viewer.
+- Use raycasting-based picking and control-point dragging.
 
-The goal is to build robust, well-specified geometric operations that can later be driven by an AI agent.
+The goal is to develop robust geometric operations with a clean interface that can be driven interactively or by higher-level automation/AI agents.
 
 ---
 
 ## Architecture
 
 ```
-IPython (main thread)                 Panda3D subprocess (main thread)
-─────────────────────                 ────────────────────────────────
-Model (gmsh / OCC)                    ViewerApp (ShowBase)
-  └─ _notify_observers()  ──pipe──►   pipe_reader thread → cmd_queue
-                                        └─ _process_commands task
-                                             └─ scene.rebuild()
-Viewer._send('update', data)
-  └─ conn.send(...)        ──pipe──►   same path
-
-Picking (future):
-                             ◄──pipe── conn.send(('pick', coords))
-Viewer._event_thread
-  └─ on_pick(coords)
+IPython / Python script (parent process)      Panda3D subprocess (child process)
+────────────────────────────────────────       ──────────────────────────────────
+CADModel + SplineModel                        ViewerApp (ShowBase)
+  └─ Observable._notify_observers() ─pipe─►    pipe_reader thread -> cmd_queue
+Viewer + ACL adapters                           -> process commands -> scene patch
+  └─ send(ScenePayload / ViewerCommand)      ◄─ send(ViewEventType, data)
 ```
 
-> **Why a subprocess?** On macOS, OpenGL must run on the main thread of the process that owns the window. Spawning Panda3D in a dedicated subprocess leaves IPython's main thread fully interactive. All data exchanged over the pipe is plain picklable dicts — no gmsh dependency on the viewer side.
+> **Why a subprocess?** OpenGL must run on the main thread of the process owning the window. Running Panda3D in a dedicated subprocess keeps the parent Python session responsive.
+
+See [doc/architecture.md](doc/architecture.md) for the focused IPC guide and [doc/technical_reference_v1.md](doc/technical_reference_v1.md) for the full architecture and data contracts.
 
 ---
 
@@ -62,60 +58,68 @@ Viewer._event_thread
 
 ```python
 import bot
+from bot.core.spline import SplineModel, BEZIER_TYP
+from bot.viewer.contracts import ViewEventType
 
-# 1. Load geometry
-model = bot.Model()
-model.open("data/profil_1.geo")
+# 1. Load CAD geometry
+cad_model = bot.CADModel()
+cad_model.open("data/profil_1.geo")
 
-# 2. Start the viewer (non-blocking — Panda3D runs in a subprocess)
+# 2. Optional spline model (FerriSpline-backed)
+spline_model = SplineModel()
+spline_model.add_curve(
+    BEZIER_TYP,
+    degree=3,
+    control_points=[[0.0, 0.0, 0.0], [1.0, 3.0, 0.0], [4.0, 3.0, 0.0], [5.0, 0.0, 0.0]],
+)
+
+# 3. Start viewer (non-blocking; child process)
 viewer = bot.Viewer()
-viewer.connect(model).run()
+viewer.connect_models(cad_model, spline_model).run()
 
-# 3. Query the model
-print(model.get_point_tags())   # [1, 2, 3, 4, 5, 6]
-print(model.get_curve_tags())   # [1, 2, 3, 4, 5]
+# 4. Query and mutate CAD
+print(cad_model.get_point_tags())
+print(cad_model.get_curve_tags())
+cad_model.add_point([10.0, 5.0, 0.0])  # observer update -> scene update
 
-# 4. Mutate — the viewer updates automatically
-model.add_point([10.0, 5.0, 0.0])
+# 5. React to visual events
+def on_curve_selected(curve_tag):
+    print("Selected:", curve_tag)
 
-# 5. React to picking events
-viewer.on_pick = lambda coords: model.add_point(coords)
+viewer.add_callback(ViewEventType.CURVE_SELECTED, on_curve_selected)
 
-# 6. Standard view shortcuts (in the viewer window)
-#    c       — re-centre on model
-#    x/y/z   — align to right / front / top view
-#    Scroll  — zoom
-#    Drag    — rotate   |   Shift+Drag — pan
-
-# 7. Clean shutdown
+# 6. Clean shutdown
 viewer.stop()
-model.finalize()
+cad_model.finalize()
 ```
+
+The repository includes a fuller dual-model example in [main.ipy](main.ipy).
 
 ### Render data format
 
-The data dict exchanged between the model and the viewer is a plain Python dict:
+Parent/child geometry synchronization uses typed IPC payloads defined in `bot.viewer.contracts`:
 
-```python
-{
-    'points': [(x, y, z), ...],               # discretised mesh nodes
-    'edges':  [(idx_a, idx_b, curve_tag), ...],
-    'bounds': {
-        'min': [x, y, z], 'max': [x, y, z],
-        'center': [x, y, z], 'size': [dx, dy, dz],
-    },
-}
-```
+- `ScenePayload` with operation `ADD` / `UPDATE` / `DELETE`
+- per-curve `CurveDelta`
+- float32 packed vertex channels (`bytes`) for compact transport
+
+At runtime:
+
+- parent serializes geometry with `floats_to_bytes` (`bot.viewer.serialize`),
+- `multiprocessing.Pipe` transports pickled `(cmd, data)` tuples,
+- child applies updates via `np.frombuffer(...)` on binary channels for patch updates.
+
+See [doc/technical_reference_v1.md](doc/technical_reference_v1.md#3-core-mechanisms) for the full schema and flow.
 
 ---
 
 ## Development guide
 
-We use [uv](https://docs.astral.sh/uv/) for all dependency and environment management.
+We use [uv](https://docs.astral.sh/uv/) for dependency and environment management.
 
 ### Prerequisites
 
-- Python ≥ 3.14
+- Python >= 3.14
 - [uv](https://docs.astral.sh/uv/) — install with `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - On headless Linux: `sudo apt-get install libglu1-mesa libosmesa6`
 
@@ -124,10 +128,12 @@ We use [uv](https://docs.astral.sh/uv/) for all dependency and environment manag
 ```bash
 git clone --recurse-submodules https://github.com/franck-ledoux/bot.git
 cd bot
-uv sync          # creates .venv and installs all production + dev dependencies
+uv sync --all-extras --dev
 ```
 
-> **Never edit `uv.lock` by hand.** Always commit it — it guarantees every contributor uses the exact same dependency versions.
+`ferrispline/` is a required submodule and is installed as a local path dependency (`ferrispline/python`) during `uv sync`.
+
+> **Never edit `uv.lock` by hand.** Commit it when dependency resolution changes.
 
 ### 2. Add or remove dependencies
 
@@ -167,12 +173,14 @@ Build static HTML into `docs/`:
 uv run pdoc ./bot -o ./docs
 ```
 
+Developer guides are indexed in [doc/index.md](doc/index.md).
+
 ### 5. Continuous integration
 
-Each push and pull request automatically triggers a GitHub Actions workflow that:
+Each push and pull request triggers GitHub Actions workflows:
 
-- Runs the full test suite on Ubuntu.
-- Uploads coverage to [Codecov](https://codecov.io/gh/franck-ledoux/bot).
+- `tests.yml`: test run + coverage upload
+- `lint.yml`: Ruff lint and format checks
 
 ---
 
@@ -182,33 +190,38 @@ Each push and pull request automatically triggers a GitHub Actions workflow that
 bot/
 ├── bot/
 │   ├── core/
-│   │   └── cad.py          # Model — gmsh/OCC geometry + observer pattern
+│   │   ├── cad.py             # CADModel (gmsh/OCC)
+│   │   ├── spline.py          # SplineModel (ferrispline.PyModel wrapper)
+│   │   └── observable.py      # Observer base
+│   ├── viewer/
+│   │   ├── viewer.py          # Viewer public API, subprocess lifecycle
+│   │   ├── contracts.py       # IPC message types (ScenePayload, ViewEventType, ...)
+│   │   ├── serialize.py       # Float32 packing/unpacking helpers
+│   │   └── viewable.py        # ACL adapters (CADAdapter, SplineAdapter)
 │   ├── view/
-│   │   ├── scene.py         # Scene + Gizmo — Panda3D geometry rendering
-│   │   └── utils.py         # View-layer utilities (ColorGenerator, …)
-│   ├── control/
-│   │   ├── camera.py        # CameraController — orthographic camera
-│   │   ├── keyboard.py      # KeyboardHandler
-│   │   └── mouse.py         # MouseHandler
-│   └── viewer/
-│       ├── viewer.py        # Viewer — public API, manages the subprocess
-│       └── app.py           # ViewerApp — Panda3D ShowBase (runs in subprocess)
-|── ferrispline/             # Submodule library for generating, manipulating and computing hexahedral meshes
+│   │   ├── scene.py           # Scene patch/apply logic
+│   │   └── curve_app.py       # Curve rendering + collision solids
+│   └── control/
+│       ├── picker.py          # RayPicker raycasting
+│       ├── mouse.py           # Mouse interactions and drag sessions
+│       └── keyboard.py        # Shortcuts and axis constraints
+├── ferrispline/               # Rust/Python NURBS library submodule
+├── doc/                       # Developer docs (index + focused guides + technical reference)
 ├── tests/
-│   ├── unit/                # Isolated class tests (no display required)
-│   └── system/              # End-to-end workflow tests
-├── data/                    # Sample .geo files
-├── docs/                    # Generated HTML documentation
-├── bot_config.toml          # Runtime configuration (scene, camera)
-├── pyproject.toml           # Project metadata, dependencies, pytest config
-└── uv.lock                  # Deterministic lockfile — always commit this
+│   ├── unit/
+│   └── system/
+├── data/
+├── main.ipy                   # End-to-end interactive example
+├── bot_config.toml
+├── pyproject.toml
+└── uv.lock
 ```
 
 ---
 
 ## Contributing
 
-We follow a **branch-and-pull-request** workflow. Direct pushes to `main` are not allowed.
+We follow a branch-and-pull-request workflow. Direct pushes to `main` are not allowed.
 
 ### Branch naming
 
@@ -259,28 +272,25 @@ docs: document Scene and Gizmo classes
 
 ### Pull request checklist
 
-Before requesting a review, make sure:
-
-- [ ] All existing tests pass: `uv run pytest`
-- [ ] New code is covered by unit or system tests.
-- [ ] Docstrings are present on all new public classes and methods (English, Google style).
-- [ ] `uv.lock` is committed if dependencies changed.
-- [ ] The PR description explains **what** changed and **why**.
-- [ ] The branch is rebased on the latest `main`.
+- [ ] `uv run pytest` passes
+- [ ] New behavior has test coverage
+- [ ] Public API/documentation changes are documented
+- [ ] `uv.lock` is committed if dependencies changed
+- [ ] PR explains what changed and why
 
 ### Code standards
 
-- **Formatting:** standard Python conventions (PEP 8).
-- **Docstrings:** English, Google style, on all public symbols.
-- **Type hints:** use them on all new function signatures.
-- **No direct push to `main`** — all changes go through a PR.
+- Formatting: standard Python conventions (PEP 8)
+- Docstrings: English, Google style, for public symbols
+- Type hints: required for new public signatures
 
 ### Troubleshooting
 
 **Panda3D / OpenGL errors on headless Linux:**
+
 ```bash
 sudo apt-get install libglu1-mesa libosmesa6
 ```
 
 **Subprocess tests open a window — is that expected?**
-Yes. `tests/system/test_viewer_subprocess.py` starts the real Panda3D process. Those tests are automatically skipped in headless environments (`DISPLAY` / `WAYLAND_DISPLAY` not set).
+Yes. `tests/system/test_viewer_subprocess.py` starts the real Panda3D process and is skipped automatically when no display is available.
