@@ -1,5 +1,7 @@
 class Observable:
-    """Classe de base pour doter les modèle de capacités de notification."""
+    """
+    Base class for equipping models with notification capabilities.
+    """
 
     def __init__(self) -> None:
         self._observers = []
