@@ -19,7 +19,7 @@ flowchart TB
         EventThread["Existing daemon event thread"]
         Models["CADModel / SplineModel"]
         Adapters["CADAdapter / SplineAdapter ACL"]
-        Composite["CompositeViewable"]
+        Composite["CompositeAdapter"]
         Viewer["Viewer"]
         REPL --> Models
         Models --> Adapters --> Composite --> Viewer
@@ -27,7 +27,7 @@ flowchart TB
     end
 
     subgraph Child["Child process — Panda3D"]
-        App["ViewerApp"]
+        App["View"]
         Scene["Scene.apply_patch"]
         Mouse["MouseHandler — drag unchanged"]
         Mouse --> App

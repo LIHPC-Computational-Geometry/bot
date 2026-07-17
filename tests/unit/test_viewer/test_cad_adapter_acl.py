@@ -7,7 +7,7 @@ from bot.core.cad import CADModel
 from bot.viewer.serialize import bytes_to_point_list
 from bot.viewer.tags import encode, CAD_NS
 from bot.viewer.contracts import SceneUpdateOp, ViewerCommandType, ViewEventType
-from bot.viewer.viewable import CADAdapter
+from bot.viewer.adapter import CADAdapter
 
 GEO_FILE = "data/profil_1.geo"
 

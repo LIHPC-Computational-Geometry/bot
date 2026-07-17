@@ -1,4 +1,4 @@
-"""IViewable adapters bridging core models to the viewer IPC layer.
+"""Adapter adapters bridging core models to the viewer IPC layer.
 
 Adapters translate domain models (CAD, splines) into ``ScenePayload`` deltas
 for the render subprocess and turn ``ViewEvent`` interactions into
@@ -40,7 +40,7 @@ from bot.viewer.tags import (
 _logger = logging.getLogger(__name__)
 
 
-class IViewable(Protocol):
+class Adapter(Protocol):
     """Interface for objects that can be rendered and observed by the Viewer."""
 
     def bind_update(self, callback: Callable[[ScenePayload], None]) -> None:
@@ -388,23 +388,23 @@ class SplineAdapter:
         return []
 
 
-class CompositeViewable:
+class CompositeAdapter:
     """
-    Aggregator for multiple IViewable adapters (e.g., CAD and Spline).
+    Aggregator for multiple Adapter adapters (e.g., CAD and Spline).
 
     It routes events to the correct adapter based on tag namespaces.
     """
 
-    def __init__(self, adapters: dict[str, IViewable]):
+    def __init__(self, adapters: dict[str, Adapter]):
         self._adapters = adapters
         self._update_callback: Callable[[ScenePayload], None] | None = None
 
     @classmethod
     def from_models(
         cls, cad_model: CADModel, spline_model: SplineModel | None = None
-    ) -> CompositeViewable:
-        """Construct a composite viewable from CAD and optional spline models."""
-        adapters: dict[str, IViewable] = {"cad": CADAdapter(cad_model)}
+    ) -> CompositeAdapter:
+        """Construct a composite adapter from CAD and optional spline models."""
+        adapters: dict[str, Adapter] = {"cad": CADAdapter(cad_model)}
         if spline_model is not None:
             adapters["spline"] = SplineAdapter(spline_model)
         return cls(adapters)

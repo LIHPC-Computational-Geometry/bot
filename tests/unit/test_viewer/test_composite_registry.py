@@ -1,11 +1,11 @@
-"""Unit tests for CompositeViewable registry routing."""
+"""Unit tests for CompositeAdapter registry routing."""
 
 import unittest
 from unittest.mock import MagicMock
 
 from bot.viewer.tags import encode, CAD_NS, SPLINE_NS
 from bot.viewer.contracts import ViewerCommandType, ViewEventType
-from bot.viewer.viewable import CompositeViewable
+from bot.viewer.adapter import CompositeAdapter
 
 
 class TestCompositeRegistry(unittest.TestCase):
@@ -18,7 +18,7 @@ class TestCompositeRegistry(unittest.TestCase):
         self.spline.handle_event.return_value = [
             {"cmd": ViewerCommandType.UPDATE_HUD, "text": SPLINE_NS}
         ]
-        self.composite = CompositeViewable({CAD_NS: self.cad, SPLINE_NS: self.spline})
+        self.composite = CompositeAdapter({CAD_NS: self.cad, SPLINE_NS: self.spline})
 
     def test_routes_cad_tag(self):
         tag = encode(CAD_NS, 3)

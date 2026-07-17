@@ -26,7 +26,7 @@ _DEFAULT_CAMERA = {
 }
 
 
-class ViewerApp(ShowBase):
+class View(ShowBase):
     """
     Internal  application.
     Receives display data via a thread-safe queue and renders it.

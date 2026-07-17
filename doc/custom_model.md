@@ -1,8 +1,8 @@
 # Connecting a New Model
 
-The `Viewer` is decoupled from concrete business classes using an Anti-Corruption Layer (ACL) pattern. To connect a new data model, you must wrap it in an adapter class that adheres to the `IViewable` protocol.
+The `Viewer` is decoupled from concrete business classes using an Anti-Corruption Layer (ACL) pattern. To connect a new data model, you must wrap it in an adapter class that adheres to the `Adapter` protocol.
 
-## The IViewable Protocol
+## The Adapter Protocol
 
 Every adapter must implement the following 4 methods:
 1. `bind_update(callback)`: Registers a callback that triggers whenever the underlying model is modified.
@@ -18,14 +18,14 @@ Let's write a fully compliant adapter for a hypothetical custom polygonal model 
 
 ```python
 import logging
-from bot.viewer.viewable import IViewable
+from bot.viewer.adapter import Adapter
 from bot.viewer.contracts import ScenePayload, SceneUpdateOp, ViewEventType, ViewerCommandType, ViewerCommand, ViewEvent
 from bot.viewer.serialize import pack_curve_delta
 from bot.viewer.tags import encode, decode, is_namespaced
 
 _logger = logging.getLogger(__name__)
 
-class CustomPolylineAdapter(IViewable):
+class CustomPolylineAdapter(Adapter):
     NAMESPACE = "polyline"
 
     def __init__(self, model):

@@ -5,7 +5,7 @@ Welcome to the **bot** developer documentation. This guide is designed to help y
 ## Documentation Map
 
 1. **[Architecture & IPC Flow](architecture.md)**: Understand the multi-process design (Parent vs. Child process), the IPC communication pipe, and the vital differences between Events and Commands.
-2. **[Connecting a New Model](custom_model.md)**: A step-by-step guide on using the IViewable protocol to bridge any custom mathematical or geometric model to the 3D viewer.
+2. **[Connecting a New Model](custom_model.md)**: A step-by-step guide on using the Adapter protocol to bridge any custom mathematical or geometric model to the 3D viewer.
 3. **[Customizing Callbacks](callbacks.md)**: Learn how to intercept user interactions using custom Python callbacks without breaking the default UI behavior.
 
 ## Directory Layout of the Source Code

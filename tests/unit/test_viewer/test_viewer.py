@@ -11,8 +11,8 @@ from unittest.mock import MagicMock
 from bot.viewer.contracts import SceneUpdateOp, ViewerCommandType, ViewEventType
 
 
-class _FakeViewable:
-    """Minimal IViewable stand-in."""
+class _Fakeadapter:
+    """Minimal Adapter stand-in."""
 
     def __init__(self):
         self._callback = None
@@ -40,31 +40,31 @@ class TestViewerConnect(unittest.TestCase):
 
         return Viewer()
 
-    def test_connect_binds_viewable(self):
+    def test_connect_binds_adapter(self):
         viewer = self._make_viewer()
-        viewable = _FakeViewable()
-        viewer._connect(viewable)
-        self.assertTrue(viewable.bound)
-        self.assertIs(viewer._viewable, viewable)
+        adapter = _Fakeadapter()
+        viewer._connect(adapter)
+        self.assertTrue(adapter.bound)
+        self.assertIs(viewer._adapter, adapter)
 
     def test_connect_returns_self_for_chaining(self):
         viewer = self._make_viewer()
-        result = viewer._connect(_FakeViewable())
+        result = viewer._connect(_Fakeadapter())
         self.assertIs(result, viewer)
 
-    def test_connect_replaces_previous_viewable(self):
+    def test_connect_replaces_previous_adapter(self):
         viewer = self._make_viewer()
-        v1 = _FakeViewable()
-        v2 = _FakeViewable()
+        v1 = _Fakeadapter()
+        v2 = _Fakeadapter()
         viewer._connect(v1)
         viewer._connect(v2)
         self.assertTrue(v1.unbound)
-        self.assertIs(viewer._viewable, v2)
+        self.assertIs(viewer._adapter, v2)
 
     def test_connect_sends_add_when_pipe_open(self):
         viewer = self._make_viewer()
         viewer._conn = MagicMock()
-        viewer._connect(_FakeViewable())
+        viewer._connect(_Fakeadapter())
         viewer._conn.send.assert_called_with(
             (SceneUpdateOp.ADD, {"op": SceneUpdateOp.ADD, "changed_curves": {}})
         )
@@ -76,21 +76,21 @@ class TestViewerDisconnect(unittest.TestCase):
 
         return Viewer()
 
-    def test_disconnect_unbinds_viewable(self):
+    def test_disconnect_unbinds_adapter(self):
         viewer = self._make_viewer()
-        viewable = _FakeViewable()
-        viewer._connect(viewable)
+        adapter = _Fakeadapter()
+        viewer._connect(adapter)
         viewer.disconnect()
-        self.assertTrue(viewable.unbound)
-        self.assertIsNone(viewer._viewable)
+        self.assertTrue(adapter.unbound)
+        self.assertIsNone(viewer._adapter)
 
     def test_disconnect_returns_self_for_chaining(self):
         viewer = self._make_viewer()
-        viewer._connect(_FakeViewable())
+        viewer._connect(_Fakeadapter())
         result = viewer.disconnect()
         self.assertIs(result, viewer)
 
-    def test_disconnect_without_viewable_is_safe(self):
+    def test_disconnect_without_adapter_is_safe(self):
         viewer = self._make_viewer()
         viewer.disconnect()
 
@@ -156,14 +156,14 @@ class TestViewerMoveControlPoint(unittest.TestCase):
         viewer.set_hud_text = MagicMock()
         return viewer
 
-    def test_move_control_point_delegates_to_viewable(self):
+    def test_move_control_point_delegates_to_adapter(self):
         viewer = self._make_viewer()
-        viewable = MagicMock()
-        viewable.handle_event.return_value = []
-        viewer._viewable = viewable
+        adapter = MagicMock()
+        adapter.handle_event.return_value = []
+        viewer._adapter = adapter
         viewer.move_control_point("spline:curve-1", 1, [1.0, 2.0, 3.0])
-        viewable.handle_event.assert_called_once()
-        event = viewable.handle_event.call_args[0][0]
+        adapter.handle_event.assert_called_once()
+        event = adapter.handle_event.call_args[0][0]
         self.assertEqual(event["event_type"], ViewEventType.CP_PICK_END)
         self.assertEqual(event["curve_tag"], "spline:curve-1")
         self.assertEqual(event["world_pos"], [1.0, 2.0, 3.0])

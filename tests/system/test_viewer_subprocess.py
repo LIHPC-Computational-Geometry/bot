@@ -62,14 +62,14 @@ class TestViewerSubprocessLifecycle(unittest.TestCase):
         v.stop()
         self.assertIsNone(v._conn)
 
-    def test_stop_disconnects_viewable(self):
+    def test_stop_disconnects_adapter(self):
         model = CADModel()
         model.open("data/profil_1.geo")
         try:
             v = self._start_viewer(model)
             time.sleep(1.0)
             v.stop()
-            self.assertIsNone(v._viewable)
+            self.assertIsNone(v._adapter)
         finally:
             model.finalize()
 

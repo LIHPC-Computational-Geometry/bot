@@ -150,11 +150,11 @@ class TestViewerStopCleansUp(unittest.TestCase):
     def tearDown(self):
         self.model.finalize()
 
-    def test_disconnect_clears_viewable(self):
+    def test_disconnect_clears_adapter(self):
         viewer, spy = _make_spied_viewer()
         viewer.connect_models(self.model)
         viewer.disconnect()
-        self.assertIsNone(viewer._viewable)
+        self.assertIsNone(viewer._adapter)
 
     def test_after_disconnect_model_mutation_does_not_reach_viewer(self):
         viewer, spy = _make_spied_viewer()

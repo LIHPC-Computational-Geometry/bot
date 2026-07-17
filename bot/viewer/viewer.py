@@ -2,7 +2,7 @@ from __future__ import annotations
 import multiprocessing as mp
 import threading
 from typing import Callable, Optional, Any
-from bot.viewer.viewable import IViewable, CADAdapter, CompositeViewable
+from bot.viewer.adapter import Adapter, CADAdapter, CompositeAdapter
 from bot.core.cad import CADModel
 from bot.core.spline import SplineModel
 from bot.viewer.contracts import (
@@ -58,10 +58,10 @@ def _viewer_subprocess(conn, config_filename: str):
         except BrokenPipeError:
             pass
 
-    from bot.viewer.app import ViewerApp
+    from bot.view.view import View
 
-    app = ViewerApp(config_filename, cmd_queue, on_event)
-    app.run()  # blocking — intentional, it's the main thread of the subprocess
+    view = View(config_filename, cmd_queue, on_event)
+    view.run()  # blocking — intentional, it's the main thread of the subprocess
 
 
 # ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ VisualCallback = Callable[[Any], None] | None
 
 class Viewer:
     """
-    3D Viewer connected to an IViewable data source.
+    3D Viewer connected to an Adapter data source.
 
     IPython usage:
         k = bot.CADModel()
@@ -88,7 +88,7 @@ class Viewer:
 
     def __init__(self, config_filename: str = "bot_config.toml"):
         self._config_filename = config_filename
-        self._viewable: Optional["IViewable"] = None
+        self._adapter: Optional["Adapter"] = None
         self._conn = None  # parent end of the Pipe
         self._process = None  # Panda3D subprocess
         self._event_thread = None  # event listening thread
@@ -106,17 +106,17 @@ class Viewer:
         cad_model: "CADModel",
         spline_model: Optional["SplineModel"] = None,
     ) -> "Viewer":
-        """Convenience wrapper that builds a CompositeViewable from core models."""
+        """Convenience wrapper that builds a CompositeAdapter from core models."""
 
         if spline_model is None:
-            return self._connect(CompositeViewable({"cad": CADAdapter(cad_model)}))
-        return self._connect(CompositeViewable.from_models(cad_model, spline_model))
+            return self._connect(CompositeAdapter({"cad": CADAdapter(cad_model)}))
+        return self._connect(CompositeAdapter.from_models(cad_model, spline_model))
 
     def disconnect(self) -> "Viewer":
-        """Detach the viewer from the current viewable."""
-        if self._viewable is not None:
-            self._viewable.unbind_update()
-            self._viewable = None
+        """Detach the viewer from the current adapter."""
+        if self._adapter is not None:
+            self._adapter.unbind_update()
+            self._adapter = None
 
         if hasattr(self, "_default_event_handler"):
             delattr(self, "_default_event_handler")
@@ -142,8 +142,8 @@ class Viewer:
         self._process.start()
         child_conn.close()  # useless in the parent process
 
-        if self._viewable is not None:
-            self._send(SceneUpdateOp.ADD, self._viewable.get_delta_load())
+        if self._adapter is not None:
+            self._send(SceneUpdateOp.ADD, self._adapter.get_delta_load())
 
         self._start_event_listener()
         return self
@@ -235,9 +235,9 @@ class Viewer:
     def move_control_point(
         self, curve_tag: str, cp_index: int, new_pos: list[float]
     ) -> "Viewer":
-        """Move a control point via the viewable event path from IPython."""
-        if self._viewable is None:
-            self.set_hud_text("No viewable connected.")
+        """Move a control point via the adapter event path from IPython."""
+        if self._adapter is None:
+            self.set_hud_text("No adapter connected.")
             return
 
         event: ViewEvent = {
@@ -246,7 +246,7 @@ class Viewer:
             "cp_index": cp_index,
             "world_pos": new_pos,
         }
-        self._dispatch_commands(self._viewable.handle_event(event))
+        self._dispatch_commands(self._adapter.handle_event(event))
         self.set_hud_text(f"Control point {cp_index} of curve {curve_tag} moved.")
         return self
 
@@ -254,26 +254,26 @@ class Viewer:
     # INTERNAL FUNCTIONS
     # =========================================================================
 
-    def _connect(self, viewable: "IViewable") -> "Viewer":
+    def _connect(self, adapter: "Adapter") -> "Viewer":
         """
-        Connects this viewer to an IViewable source.
+        Connects this viewer to an Adapter source.
         Can be called before or after run().
         Returns self for chaining.
         """
-        if self._viewable is not None:
+        if self._adapter is not None:
             self.disconnect()
 
-        self._viewable = viewable
-        viewable.bind_update(self._on_delta)
+        self._adapter = adapter
+        adapter.bind_update(self._on_delta)
 
-        self._default_event_handler = self._create_default_handler(viewable)
+        self._default_event_handler = self._create_default_handler(adapter)
 
         if self._conn is not None:
-            self._send(SceneUpdateOp.ADD, viewable.get_delta_load())
+            self._send(SceneUpdateOp.ADD, adapter.get_delta_load())
         return self
 
     def _create_default_handler(
-        self, viewable: "IViewable"
+        self, adapter: "Adapter"
     ) -> Callable[[ViewEventType, Any], None]:
         """Create a closure for translate event into visual commands."""
 
@@ -281,7 +281,7 @@ class Viewer:
             # 1. Format event
             view_event = self._build_view_event(event_type, data)
             # 2. The adapter choose commands to apply
-            commands = viewable.handle_event(view_event)
+            commands = adapter.handle_event(view_event)
             # 3. The Viewer send these commands to the child process
             self._dispatch_commands(commands)
 

@@ -10,7 +10,7 @@ import unittest
 from bot.core.cad import CADModel
 from bot.viewer.tags import CAD_NS, encode, prefix
 from bot.viewer.contracts import SceneUpdateOp
-from bot.viewer.viewable import CADAdapter
+from bot.viewer.adapter import CADAdapter
 
 
 class _MockObserver:
