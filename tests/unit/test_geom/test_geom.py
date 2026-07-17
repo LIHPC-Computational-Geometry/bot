@@ -1,5 +1,5 @@
 import unittest
-from bot.core.cad import Model as CADModel
+from bot.core.cad import CADModel
 
 
 class GeomTest(unittest.TestCase):

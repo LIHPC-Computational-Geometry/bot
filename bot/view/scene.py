@@ -10,6 +10,8 @@ from panda3d.core import (
 )
 
 from bot.view.curve_app import CurveApp
+from bot.viewer.contracts import ScenePayload
+from bot.viewer.serialize import payload_to_geom_data
 
 _DEFAULT_BOUNDS = {
     "min": [0, 0, 0],
@@ -67,9 +69,9 @@ class Scene:
         self.base.set_background_color(self.background_color)
 
         self.line_thickness: float = float(settings.get("line_thickness", 2.0))
-        self.curves: Dict[int, CurveApp] = {}
+        self.curves: Dict[str, CurveApp] = {}
 
-        self.active_curve_tag: Optional[int] = None
+        self.active_curve_tag: Optional[str] = None
         self.edit_mode_enabled: bool = False
         self.axis_constraint_mask: int = 3
 
@@ -103,11 +105,10 @@ class Scene:
         return self._geom_data.get("bounds", _DEFAULT_BOUNDS)
 
     def _get_curve(self, tag: Any) -> Optional[CurveApp]:
-        """Safe utility to retrieve a curve by its tag."""
-        try:
-            return self.curves.get(int(tag))
-        except TypeError, ValueError:
+        """Safe utility to retrieve a curve by its namespaced tag."""
+        if tag is None:
             return None
+        return self.curves.get(str(tag))
 
     def _build_from_data(self, geom_data: Dict[str, Any]) -> NodePath:
         """
@@ -118,7 +119,7 @@ class Scene:
 
         # Instantiation of CurveApp objects
         for tag, curve_info in curves_data.items():
-            self.curves[int(tag)] = CurveApp(tag, curve_info)
+            self.curves[str(tag)] = CurveApp(str(tag), curve_info)
 
         geom_root = self.base.render.attachNewNode("geom_root")
 
@@ -157,20 +158,16 @@ class Scene:
 
     def set_active_curve(self, tag: Any):
         """Sets the currently selected curve for editing."""
-        try:
-            normalized = int(tag) if tag is not None else None
-        except TypeError, ValueError:
-            normalized = None
-
+        normalized = str(tag) if tag is not None else None
         self.active_curve_tag = normalized
         for curve_tag, curve in self.curves.items():
             curve.set_cp_visible(self.edit_mode_enabled and normalized == curve_tag)
 
-    def preview_control_point(self, tag: int, cp_index: int, new_pos: List[float]):
+    def preview_evaluate(self, tag: str, cp_index: int, new_pos: List[float]):
         """Previews the displacement of a control point in real-time."""
         curve = self._get_curve(tag)
         if curve is not None:
-            curve.preview_control_point(int(cp_index), new_pos)
+            curve.preview_evaluate(int(cp_index), new_pos)
 
         if self._constraint_guide_visible:
             self.update_axis_guide(new_pos, self.axis_constraint_mask)
@@ -270,6 +267,32 @@ class Scene:
         if self.geom_node is not None:
             self.geom_node.removeNode()
         self.geom_node = self._build_from_data(geom_data)
+
+    def apply_patch(self, payload: ScenePayload) -> None:
+        """Apply incremental curve geometry updates from the parent process."""
+        for tag, delta in payload.get("changed_curves", {}).items():
+            curve = self._get_curve(tag)
+            if curve is None:
+                continue
+            geometry = delta["geometry"]
+            curve.apply_geometry_bytes(
+                geometry["curve_vertices"], delta["vertex_count"]
+            )
+            cp_vertices = geometry.get("cp_vertices")
+            if cp_vertices is not None and delta.get("cp_count"):
+                curve.apply_control_vertices_bytes(cp_vertices, delta["cp_count"])
+
+    def remove_curves(self, tags: list[str]) -> None:
+        """Remove curves identified by namespaced tags."""
+        for tag in tags:
+            curve = self.curves.pop(str(tag), None)
+            if curve is not None and curve.node_path is not None:
+                curve.node_path.removeNode()
+
+    def load_from_payload(self, payload: ScenePayload) -> None:
+        """Load or rebuild the scene from a full add payload."""
+        geom_data = payload_to_geom_data(payload)
+        self.rebuild(geom_data)
 
     def clear(self):
         """Cleans up all scene nodes."""

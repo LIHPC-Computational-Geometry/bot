@@ -40,7 +40,7 @@ The goal is to develop robust geometric operations with a clean interface that c
 ```
 IPython / Python script (parent process)      Panda3D subprocess (child process)
 ────────────────────────────────────────       ──────────────────────────────────
-CADModel + SplineModel                        ViewerApp (ShowBase)
+CADModel + SplineModel                        View (ShowBase)
   └─ Observable._notify_observers() ─pipe─►    pipe_reader thread -> cmd_queue
 Viewer + ACL adapters                           -> process commands -> scene patch
   └─ send(ScenePayload / ViewerCommand)      ◄─ send(ViewEventType, data)
@@ -197,10 +197,12 @@ bot/
 │   │   ├── viewer.py          # Viewer public API, subprocess lifecycle
 │   │   ├── contracts.py       # IPC message types (ScenePayload, ViewEventType, ...)
 │   │   ├── serialize.py       # Float32 packing/unpacking helpers
-│   │   └── viewable.py        # ACL adapters (CADAdapter, SplineAdapter)
+│   │   └── adapter.py         # ACL adapters (CADAdapter, SplineAdapter)
+|   |   └── tag.py             # Namespaced curve tag utilities for the viewer adapter boundary
 │   ├── view/
 │   │   ├── scene.py           # Scene patch/apply logic
 │   │   └── curve_app.py       # Curve rendering + collision solids
+|   |   └── view.py            # View — Panda3D ShowBase (runs in subprocess)
 │   └── control/
 │       ├── picker.py          # RayPicker raycasting
 │       ├── mouse.py           # Mouse interactions and drag sessions
