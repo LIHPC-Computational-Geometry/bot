@@ -14,7 +14,7 @@ from panda3d.core import (
     NodePath,
 )
 import numpy as np
-from bot.core.spline import SplineModel
+from bot.core.spline import SplineModel, BEZIER_TYP, NURBS_TYP
 
 MASK_CURVE_PICK = BitMask32.bit(1)
 MASK_CP_PICK = BitMask32.bit(2)
@@ -26,7 +26,7 @@ class CurveApp:
     """
 
     def __init__(self, tag: str, curve_data: Dict):
-        self.tag: int = int(tag)
+        self.tag: str = str(tag)
         self.edges: List = curve_data["edges"]
         self.points: List = curve_data["points"]
         self.type: str = curve_data["type"]
@@ -54,21 +54,21 @@ class CurveApp:
         self.curve_pick_radius: float = 0.2
         self.cp_pick_radius: float = 0.4
 
-        if self.type in ("bezier", "bspline"):
+        if self.type in (BEZIER_TYP, NURBS_TYP):
             self.control_points = curve_data.get("control_points", [])
             self.cp_color = [
                 [0.5, 0.5, 0.5, 1.0] for _ in range(len(self.control_points))
             ]
             self.degree = curve_data.get("degree")
 
-        if self.type == "bspline":
+        if self.type == NURBS_TYP:
             self.knots = curve_data.get("knots")
 
     # =========================================================================
     # VISUAL PART (RENDERING)
     # =========================================================================
 
-    def _draw_control_points(self, parent_node: NodePath):
+    def __draw_control_points(self, parent_node: NodePath):
         """Generates the visual geometry for control points and their connections."""
         format = GeomVertexFormat.getV3cp()
         vdata = GeomVertexData("anchors", format, Geom.UHDynamic)
@@ -106,7 +106,7 @@ class CurveApp:
             self._cp_line_node.removeNode()
         self._cp_line_node = parent_node.attachNewNode(lines.create())
 
-    def _draw_curve(self):
+    def __draw_curve(self):
         """Generates the main visual line of the curve."""
         lines = LineSegs()
         lines.setThickness(float(self.line_thickness))
@@ -133,14 +133,14 @@ class CurveApp:
         cnode.setFromCollideMask(BitMask32.allOff())
         cnode.setIntoCollideMask(MASK_CURVE_PICK)
 
-        self._populate_curve_collision_solids(cnode)
+        self.__populate_curve_collision_solids(cnode)
 
         cnp = self.curve_collision_node.attachNewNode(cnode)
         cnp.setTag("curve_tag", str(self.tag))
         cnp.setTag("pick_kind", "curve")
         return cnp
 
-    def _populate_curve_collision_solids(self, cnode: CollisionNode):
+    def __populate_curve_collision_solids(self, cnode: CollisionNode):
         """Generates collision tubes for the curve edges."""
         for idxA, idxB in self.edges:
             ptA, ptB = self.points[idxA], self.points[idxB]
@@ -183,31 +183,31 @@ class CurveApp:
 
     def attach_curve_node(self, node_path: NodePath) -> NodePath:
         """Fully initializes the visual and physical hierarchy of the curve."""
-        self._clean_nodes()
+        self.__clean_nodes()
         self.node_path = node_path
         self.node_path.setTag("curve_tag", str(self.tag))
 
         self.curve_render_node = self.node_path.attachNewNode("curve_render")
-        self._draw_curve()
+        self.__draw_curve()
         self.attach_collision_node()
 
         if self.control_points is not None:
-            self._attach_cp_node()
+            self.__attach_cp_node()
 
         return self.node_path
 
-    def _attach_cp_node(self) -> NodePath:
+    def __attach_cp_node(self) -> NodePath:
         """Initializes the parent node for the control points."""
         self.cp_render_node = self.node_path.attachNewNode("cp_render")
         self.cp_node = self.cp_render_node
-        self._draw_control_points(self.cp_render_node)
+        self.__draw_control_points(self.cp_render_node)
         self.rebuild_cp_collision()
 
         self.cp_node.setLightOff(1)
         self.cp_node.hide()
         return self.cp_node
 
-    def _clean_nodes(self):
+    def __clean_nodes(self):
         """Cleans up all existing nodes before reinitialization."""
         if self.curve_render_node:
             self.curve_render_node.removeNode()
@@ -219,11 +219,13 @@ class CurveApp:
             self.cp_collision_node.removeNode()
 
     def set_cp_color(self, cp_index: int, color: List[float]):
+        """Updates the color of a specific control point and refreshes its rendering."""
         self.cp_color[cp_index] = color
         if self.cp_node is not None:
-            self._draw_control_points(self.cp_node)
+            self.__draw_control_points(self.cp_node)
 
     def set_color(self, color: List[float]):
+        """Sets the color of the main curve geometry."""
         if self.curve_render_node:
             self.curve_render_node.setColor(*color[:4], 1)
             self.curve_render_node.setLightOff(1)
@@ -232,6 +234,7 @@ class CurveApp:
             self.cp_node.show() if self.cp_visible else self.cp_node.hide()
 
     def set_cp_visible(self, visible: bool):
+        """Toggles the visibility and collision mask of the control points."""
         self.cp_visible = visible
         if self.cp_node is None:
             return
@@ -244,15 +247,17 @@ class CurveApp:
                 cnp.node().setIntoCollideMask(current_mask)
                 cnp.setCollideMask(current_mask)
 
-    def preview_control_point(self, cp_index: int, new_pos: List[float]):
+    def preview_evaluate(self, cp_index: int, new_pos: List[float]):
+        """Updates a control point position and re-evaluates the curve for real-time preview."""
         if not self.control_points or not (0 <= cp_index < len(self.control_points)):
             return
 
         self.control_points[cp_index] = [new_pos[0], new_pos[1], new_pos[2]]
 
-        if self.type == "bezier" and self.degree is not None:
-            engine = SplineModel(str(self.tag), self.control_points, int(self.degree))
-            pts = np.array(engine.get_render_data()["curve"], dtype=np.float64)
+        if self.type == BEZIER_TYP and self.degree is not None:
+            pts = SplineModel.preview_evaluate(
+                self.type, self.degree, np.array(self.control_points, dtype=np.float64)
+            )
             if len(pts.shape) == 2 and pts.shape[0] in (2, 3) and pts.shape[1] > 3:
                 pts = pts.T
 
@@ -260,15 +265,36 @@ class CurveApp:
             self.edges = [(i, i + 1) for i in range(len(self.points) - 1)]
 
         if self.curve_render_node:
-            self._draw_curve()
+            self.__draw_curve()
         if self.cp_render_node:
-            self._draw_control_points(self.cp_render_node)
+            self.__draw_control_points(self.cp_render_node)
 
     def update_collision_sizes(self, units_per_pixel: float):
+        """Adjusts collision radius based on the current zoom level to maintain consistent screen-space picking."""
         safe_units = max(0.001, units_per_pixel)
         self.curve_pick_radius = safe_units * 6.0
         self.cp_pick_radius = safe_units * 12.0
 
         if self.node_path is not None:
             self.attach_collision_node()
+            self.rebuild_cp_collision()
+
+    def apply_geometry_bytes(self, buf: bytes, vertex_count: int) -> None:
+        """Update curve polyline vertices from a float32 byte buffer."""
+        arr = np.frombuffer(buf, dtype=np.float32, count=vertex_count * 3)
+        self.points = arr.reshape(vertex_count, 3).tolist()
+        self.edges = [(i, i + 1) for i in range(vertex_count - 1)]
+        if self.curve_render_node is not None:
+            self.__draw_curve()
+        if self.node_path is not None:
+            self.attach_collision_node()
+
+    def apply_control_vertices_bytes(self, buf: bytes, cp_count: int) -> None:
+        """Update control point positions from a float32 byte buffer."""
+        if self.control_points is None:
+            return
+        arr = np.frombuffer(buf, dtype=np.float32, count=cp_count * 3)
+        self.control_points = arr.reshape(cp_count, 3).tolist()
+        if self.cp_render_node is not None:
+            self.__draw_control_points(self.cp_render_node)
             self.rebuild_cp_collision()

@@ -2,6 +2,7 @@ from direct.showbase.InputStateGlobal import inputState
 from panda3d.core import MouseButton, Point2, Point3
 
 from bot.control.picker import RayPicker
+from bot.viewer.contracts import ViewEventType
 from bot.math.constraints import ConstraintManager
 
 
@@ -74,15 +75,15 @@ class MouseHandler:
                 )
                 self.base._scene.hide_axis_guide()
 
-                curve = self.base._scene.curves.get(int(self.drag_curve_tag))
+                curve = self.base._scene.curves.get(str(self.drag_curve_tag))
                 if curve is not None:
                     curve.attach_collision_node()
                     curve.rebuild_cp_collision()
 
             self.base._on_event_cb(
-                "cp_pick_end",
+                ViewEventType.CP_PICK_END,
                 {
-                    "tag": self.drag_curve_tag,
+                    "curve_tag": self.drag_curve_tag,
                     "cp_index": self.drag_cp_index,
                     "world_pos": world_pos,
                 },
@@ -98,7 +99,7 @@ class MouseHandler:
 
         if hovered_tag != self.last_hovered_tag:
             self.last_hovered_tag = hovered_tag
-            self.base._on_event_cb("hover", hovered_tag)
+            self.base._on_event_cb(ViewEventType.HOVER, hovered_tag)
 
     def _handle_cp_interaction(self, m_pos: Point2, left_down: bool):
         if not self.edit_mode_enabled and not self.dragging_cp:
@@ -162,9 +163,9 @@ class MouseHandler:
             )
 
         self.base._on_event_cb(
-            "cp_pick_start",
+            ViewEventType.CP_PICK_START,
             {
-                "tag": self.drag_curve_tag,
+                "curve_tag": self.drag_curve_tag,
                 "cp_index": self.drag_cp_index,
                 "world_pos": list(start_point),
             },
@@ -181,17 +182,17 @@ class MouseHandler:
         self.drag_last_valid_world_pos = list(world_pos)
 
         if getattr(self.base, "_scene", None) is not None:
-            self.base._scene.preview_control_point(
-                int(self.drag_curve_tag), self.drag_cp_index, world_pos
+            self.base._scene.preview_evaluate(
+                str(self.drag_curve_tag), self.drag_cp_index, world_pos
             )
             self.base._scene.update_axis_guide(
                 world_pos, self.constraints.drag_active_mask
             )
 
         self.base._on_event_cb(
-            "cp_drag",
+            ViewEventType.CP_DRAG,
             {
-                "tag": self.drag_curve_tag,
+                "curve_tag": self.drag_curve_tag,
                 "cp_index": self.drag_cp_index,
                 "world_pos": world_pos,
             },
@@ -225,7 +226,7 @@ class MouseHandler:
             metadata.get("pick_kind") == "curve"
             and metadata.get("curve_tag") is not None
         ):
-            self.base._on_event_cb("curve_selected", metadata["curve_tag"])
+            self.base._on_event_cb(ViewEventType.CURVE_SELECTED, metadata["curve_tag"])
 
     def _handle_drag(self, curr_pos: Point2):
         if self.dragging_cp:

@@ -9,19 +9,18 @@ Submodules:
 
 Quick start:
     import bot
-    k = bot.Model()
+    k = bot.CADModel()
     k.open("part.geo")
     v = bot.Viewer()
-    v.connect(k).run()
+    v.connect_models(k).run()
 """
 
 from . import core, view
 from .viewer import Viewer
 
 try:
-    from .core.cad import Model as CADModel
+    from .core.cad import CADModel
 except ModuleNotFoundError:
     CADModel = None
-Model = CADModel
 
-__all__ = ["core", "control", "view", "viewer", "Model", "Viewer"]
+__all__ = ["core", "control", "view", "viewer", "CADModel", "Viewer"]

@@ -2,13 +2,19 @@
 System tests — full CAD workflow.
 
 These tests exercise the Model end-to-end: file loading, topology queries,
-point addition and render-data consistency.  No Panda3D required.
+point addition and curve-discretization consistency.  No Panda3D required.
 """
 
+import pickle
 import unittest
-from bot.core.cad import Model as CADModel
+
+from bot.core.cad import CADModel
 
 GEO_FILE = "data/profil_1.geo"
+
+
+def _total_vertices(discretization):
+    return sum(len(pts) for pts, _ in discretization.values())
 
 
 class TestLoadAndTopology(unittest.TestCase):
@@ -48,8 +54,8 @@ class TestLoadAndTopology(unittest.TestCase):
             self.assertEqual(2, len(self.cad.get_adjacent_points(tag)))
 
 
-class TestRenderDataCoherence(unittest.TestCase):
-    """Verify get_render_data() returns a consistent, picklable snapshot."""
+class TestCurveDiscretizationCoherence(unittest.TestCase):
+    """Verify get_curve_discretization() and bounds stay consistent."""
 
     def setUp(self):
         self.cad = CADModel()
@@ -58,41 +64,48 @@ class TestRenderDataCoherence(unittest.TestCase):
     def tearDown(self):
         self.cad.finalize()
 
-    def test_render_data_has_all_keys(self):
-        data = self.cad.get_render_data()
-        self.assertIn("points", data)
-        self.assertIn("edges", data)
-        self.assertIn("bounds", data)
+    def test_discretization_has_one_entry_per_curve(self):
+        discretization = self.cad.get_curve_discretization()
+        self.assertEqual(len(self.cad.get_curve_tags()), len(discretization))
+        for tag in self.cad.get_curve_tags():
+            self.assertIn(tag, discretization)
 
     def test_edges_reference_valid_point_indices(self):
-        data = self.cad.get_render_data()
-        n = len(data["points"])
-        for idx_a, idx_b, _curve_tag in data["edges"]:
-            self.assertGreaterEqual(idx_a, 0)
-            self.assertLess(idx_a, n)
-            self.assertGreaterEqual(idx_b, 0)
-            self.assertLess(idx_b, n)
+        for pts, edges in self.cad.get_curve_discretization().values():
+            n = len(pts)
+            for idx_a, idx_b in edges:
+                self.assertGreaterEqual(idx_a, 0)
+                self.assertLess(idx_a, n)
+                self.assertGreaterEqual(idx_b, 0)
+                self.assertLess(idx_b, n)
+
+    def test_bounds_has_expected_keys(self):
+        bounds = self.cad.bounds
+        for key in ("min", "max", "center", "size"):
+            self.assertIn(key, bounds)
 
     def test_bounds_center_is_inside_min_max(self):
-        bounds = self.cad.get_render_data()["bounds"]
+        bounds = self.cad.bounds
         for axis in range(3):
             self.assertGreaterEqual(bounds["center"][axis], bounds["min"][axis] - 1e-9)
             self.assertLessEqual(bounds["center"][axis], bounds["max"][axis] + 1e-9)
 
     def test_bounds_size_matches_min_max(self):
-        bounds = self.cad.get_render_data()["bounds"]
+        bounds = self.cad.bounds
         for axis in range(3):
             expected = bounds["max"][axis] - bounds["min"][axis]
             self.assertAlmostEqual(bounds["size"][axis], expected, places=9)
 
-    def test_render_data_is_picklable(self):
-        import pickle
-
-        data = self.cad.get_render_data()
-        serialised = pickle.dumps(data)
+    def test_discretization_is_picklable(self):
+        discretization = self.cad.get_curve_discretization()
+        serialised = pickle.dumps(discretization)
         restored = pickle.loads(serialised)
-        self.assertEqual(data["bounds"], restored["bounds"])
-        self.assertEqual(len(data["points"]), len(restored["points"]))
+        self.assertEqual(len(discretization), len(restored))
+        for tag, (pts, edges) in discretization.items():
+            self.assertIn(tag, restored)
+            restored_pts, restored_edges = restored[tag]
+            self.assertEqual(pts, restored_pts)
+            self.assertEqual(edges, restored_edges)
 
 
 class TestAddPointWorkflow(unittest.TestCase):
@@ -102,7 +115,6 @@ class TestAddPointWorkflow(unittest.TestCase):
         self.cad = CADModel()
         self.cad.open(GEO_FILE)
         self.initial_point_count = len(self.cad.get_point_tags())
-        self.initial_render_pts = len(self.cad.get_render_data()["points"])
 
     def tearDown(self):
         self.cad.finalize()
@@ -118,17 +130,16 @@ class TestAddPointWorkflow(unittest.TestCase):
         tag = self.cad.add_point([1.0, 1.0, 0.0])
         self.assertIn(tag, self.cad.get_point_tags())
 
-    def test_add_point_updates_render_data(self):
+    def test_add_point_updates_discretization(self):
         self.cad.add_point([100.0, 100.0, 0.0])
-        new_count = len(self.cad.get_render_data()["points"])
-        # Mesh is regenerated: number of discretisation nodes changes
+        new_count = _total_vertices(self.cad.get_curve_discretization())
         self.assertGreater(new_count, 0)
 
     def test_bounds_extend_when_point_is_outside(self):
-        old_bounds = self.cad.get_render_data()["bounds"]
+        old_bounds = self.cad.bounds
         far_x = old_bounds["max"][0] + 1000.0
         self.cad.add_point([far_x, 0.0, 0.0])
-        new_bounds = self.cad.get_render_data()["bounds"]
+        new_bounds = self.cad.bounds
         self.assertGreaterEqual(new_bounds["max"][0], far_x - 1e-6)
 
     def test_cumulative_additions(self):

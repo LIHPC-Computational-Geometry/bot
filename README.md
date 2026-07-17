@@ -39,7 +39,7 @@ The goal is to build robust, well-specified geometric operations that can later 
 ```
 IPython (main thread)                 Panda3D subprocess (main thread)
 ─────────────────────                 ────────────────────────────────
-Model (gmsh / OCC)                    ViewerApp (ShowBase)
+Model (gmsh / OCC)                    View (ShowBase)
   └─ _notify_observers()  ──pipe──►   pipe_reader thread → cmd_queue
                                         └─ _process_commands task
                                              └─ scene.rebuild()
@@ -192,7 +192,7 @@ bot/
 │   │   └── mouse.py         # MouseHandler
 │   └── viewer/
 │       ├── viewer.py        # Viewer — public API, manages the subprocess
-│       └── app.py           # ViewerApp — Panda3D ShowBase (runs in subprocess)
+│       └── view.py           # View — Panda3D ShowBase (runs in subprocess)
 |── ferrispline/             # Submodule library for generating, manipulating and computing hexahedral meshes
 ├── tests/
 │   ├── unit/                # Isolated class tests (no display required)

@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 try:
     from bot.control.mouse import MouseHandler
+    from bot.viewer.contracts import ViewEventType
     from bot.math.constraints import ConstraintManager
     from panda3d.core import Point2
 
@@ -35,7 +36,7 @@ class _FakeScene:
         """Called by _start_cp_drag."""
         self.axis_guide_shown = True
 
-    def preview_control_point(self, curve_tag, cp_index, world_pos):
+    def preview_evaluate(self, curve_tag, cp_index, world_pos):
         """Called by _update_cp_drag."""
         self.previewed_cp = (curve_tag, cp_index, world_pos)
 
@@ -107,7 +108,7 @@ class TestMouseDragSession(unittest.TestCase):
         self.assertFalse(handler.dragging_cp)
         self.assertEqual(len(handler.base.events), 1)
         event_type, payload = handler.base.events[0]
-        self.assertEqual(event_type, "cp_pick_end")
+        self.assertEqual(event_type, ViewEventType.CP_PICK_END)
         self.assertEqual(payload["world_pos"], [4.0, 5.0, 6.0])
         self.assertTrue(handler.base._scene.hidden)
 
@@ -156,7 +157,7 @@ class TestMouseDragSession(unittest.TestCase):
 
         # Verify that the final event transmits the correct coordinates
         event_type, payload = handler.base.events[-1]
-        self.assertEqual(event_type, "cp_drag")
+        self.assertEqual(event_type, ViewEventType.CP_DRAG)
         self.assertEqual(payload["world_pos"], [13.0, 10.0, 0.0])
 
     def test_update_loss_of_mouse_focus_aborts_drag(self):
@@ -175,7 +176,7 @@ class TestMouseDragSession(unittest.TestCase):
 
         # Verify that the end event is sent with the default mock position (4, 5, 6)
         event_type, payload = handler.base.events[-1]
-        self.assertEqual(event_type, "cp_pick_end")
+        self.assertEqual(event_type, ViewEventType.CP_PICK_END)
         self.assertEqual(payload["world_pos"], [4.0, 5.0, 6.0])
 
     def test_wheel_zoom_during_drag_does_not_break_session(self):

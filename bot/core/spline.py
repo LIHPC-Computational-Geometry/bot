@@ -1,28 +1,26 @@
 from __future__ import annotations
-
-import ferrispline
 import numpy as np
 
+import ferrispline
 
-class SplineModel:
+from bot.core.observable import Observable
+
+BEZIER_TYP = "bezier"
+NURBS_TYP = "nurbs"
+
+
+class SplineModel(Observable):
     """
     Public curve wrapper backed by ferrispline.PyModel.
-
-    The public methods intentionally mirror the old BezierCurve contract to keep
-    existing model/viewer behavior unchanged during migration.
     """
 
-    def __init__(self, tag: str, control_points: list[list[float]], degree: int):
+    def __init__(self):
         super().__init__()
-        self.tag = str(tag)
-        self._degree = int(degree)
         self._model = ferrispline.PyModel()
-        self._curve_id: str | None = None
-        self._control_points_cache: list[list[float]] = []
-        self.set_control_points(control_points)
+        self.curves: [str] = []  # curves' tag
 
     @staticmethod
-    def _default_control_points(coords_a, coords_b, degree=3):
+    def _default_control_points(coords_a, coords_b, degree=3) -> list[list[float]]:
         points = []
 
         if degree == 0:
@@ -36,37 +34,59 @@ class SplineModel:
 
         return points
 
-    def get_tag(self):
-        return self.tag
+    def add_curve(
+        self,
+        type: str,
+        degree: int,
+        control_points: list[list[float]],
+        weights: list[float] = None,
+        knots: list[float] = None,
+    ) -> str:
+        if type == BEZIER_TYP:
+            self._notify_observers()
+            tag = self._model.create_bezier(
+                degree, np.array(control_points, dtype=np.float64), None
+            )
+            self.curves.append(tag)
+            return tag
+        elif type == NURBS_TYP:
+            self._notify_observers()
+            tag = self._model.create_nurbs(
+                degree, np.array(control_points, dtype=np.float64), None, None
+            )
+            self.curves.append(tag)
+            return tag
+        else:
+            raise TypeError("Invalid curve type")
 
-    def get_control_points(self):
-        return [list(pt) for pt in self._control_points_cache]
+    def remove_curve(self, tag: str):
+        if self._model.delete_curve(tag):
+            self._notify_observers()
 
-    def get_degree(self):
-        return self._degree
-
-    def set_control_points(self, control_points: list[list[float]]):
-        cp_array = np.array(control_points, dtype=np.float64)
-        self._control_points_cache = cp_array.tolist()
-        self._curve_id = self._model.create_bezier(self._degree, cp_array, None)
-
-    def _evaluate(self, sample: int):
-        if self._curve_id is None:
-            return np.empty((0, 3), dtype=np.float64)
-        curve_pts = self._model.evaluate(self._curve_id, int(sample))
-        if (
-            len(curve_pts.shape) == 2
-            and curve_pts.shape[0] in (2, 3)
-            and curve_pts.shape[1] > 3
-        ):
-            curve_pts = curve_pts.T
+    def _evaluate(self, tag: str, sample: int) -> list[list[float]]:
+        curve_pts = self._model.evaluate(tag, int(sample))
         return curve_pts
 
-    def get_render_data(self) -> dict:
-        curve_pts = self._evaluate(100)
-        return {
-            "tag": self.tag,
-            "control_points": self.get_control_points(),
-            "degree": self.get_degree(),
-            "curve": curve_pts.tolist(),
-        }
+    def get_control_points(self, curve_tag: str) -> list[list[float]]:
+        return self._model.get_control_points(curve_tag)
+
+    def get_degree(self, tag: str) -> int:
+        return self._model.get_degree(tag)
+
+    def move_control_point(self, tag: str, cp_index: int, new_pt: list[float]):
+        self._model.move_control_point(
+            tag, cp_index, np.array(new_pt, dtype=np.float64)
+        )
+        self._notify_observers()
+
+    def preview_evaluate(
+        type: str,
+        degree: int,
+        control_points: list[list[float]],
+        sample: int = 10,
+        weights: list[float] = None,
+        knots: list[float] = None,
+    ) -> list[list[float]]:
+        return ferrispline.PyModel().preview_evaluate(
+            type, degree, np.array(control_points, dtype=np.float64), weights, knots, 10
+        )
