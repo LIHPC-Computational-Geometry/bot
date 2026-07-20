@@ -31,14 +31,38 @@ def vertex_count_from_bytes(buf: bytes) -> int:
     return len(buf) // 12
 
 
+def scalars_to_bytes(values: Sequence[float] | np.ndarray) -> bytes:
+    """Pack scalar float values as a contiguous float32 byte array."""
+    arr = np.asarray(values, dtype=np.float32).reshape(-1)
+    return arr.tobytes()
+
+
+def scalar_count_from_bytes(buf: bytes) -> int:
+    """Return the number of float32 scalars encoded in a buffer."""
+    return len(buf) // 4
+
+
+def bytes_to_scalar_list(buf: bytes, scalar_count: int) -> list[float]:
+    """Decode float32 scalar bytes into a Python list."""
+    expected = scalar_count * 4
+    mv = memoryview(buf)[:expected]
+    return list(struct.unpack(f"{scalar_count}f", mv))
+
+
 def pack_curve_geometry(
     curve_points: Sequence[Sequence[float]] | np.ndarray,
     control_points: Sequence[Sequence[float]] | np.ndarray | None = None,
+    knots: Sequence[float] | np.ndarray | None = None,
+    weights: Sequence[float] | np.ndarray | None = None,
 ) -> CurveGeometry:
     """Build a CurveGeometry dict with float32 byte channels."""
     geometry: CurveGeometry = {"curve_vertices": floats_to_bytes(curve_points)}
     if control_points is not None and len(control_points) > 0:
         geometry["cp_vertices"] = floats_to_bytes(control_points)
+    if knots is not None and len(knots) > 0:
+        geometry["knots"] = scalars_to_bytes(knots)
+    if weights is not None and len(weights) > 0:
+        geometry["weights"] = scalars_to_bytes(weights)
     return geometry
 
 
@@ -48,9 +72,11 @@ def pack_curve_delta(
     curve_type: str = "linear",
     control_points: Sequence[Sequence[float]] | np.ndarray | None = None,
     degree: int | None = None,
+    knots: Sequence[float] | np.ndarray | None = None,
+    weights: Sequence[float] | np.ndarray | None = None,
 ) -> CurveDelta:
     """Build a single CurveDelta entry."""
-    geometry = pack_curve_geometry(curve_points, control_points)
+    geometry = pack_curve_geometry(curve_points, control_points, knots, weights)
     vertex_count = vertex_count_from_bytes(geometry["curve_vertices"])
     delta: CurveDelta = {
         "geometry": geometry,
@@ -62,6 +88,10 @@ def pack_curve_delta(
         delta["cp_count"] = len(control_points)
     if degree is not None:
         delta["degree"] = degree
+    if knots is not None and len(knots) > 0:
+        delta["knot_count"] = len(knots)
+    if weights is not None and len(weights) > 0:
+        delta["weight_count"] = len(weights)
     if edges is not None:
         delta["edges"] = edges
     return delta
@@ -120,11 +150,20 @@ def curve_delta_to_curve_info(tag: str, delta: CurveDelta) -> dict[str, Any]:
         "edges": edges,
         "type": delta["type"],
     }
-    cp_vertices = delta["geometry"].get("cp_vertices")
+    geometry = delta["geometry"]
+    cp_vertices = geometry.get("cp_vertices")
     if cp_vertices is not None and delta.get("cp_count"):
         info["control_points"] = bytes_to_point_list(cp_vertices, delta["cp_count"])
     if "degree" in delta:
         info["degree"] = delta["degree"]
+    knots_buf = geometry.get("knots")
+    if knots_buf is not None:
+        knot_count = delta.get("knot_count", scalar_count_from_bytes(knots_buf))
+        info["knots"] = bytes_to_scalar_list(knots_buf, knot_count)
+    weights_buf = geometry.get("weights")
+    if weights_buf is not None:
+        weight_count = delta.get("weight_count", scalar_count_from_bytes(weights_buf))
+        info["weights"] = bytes_to_scalar_list(weights_buf, weight_count)
     return info
 
 

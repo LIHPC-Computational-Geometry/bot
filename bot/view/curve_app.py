@@ -14,7 +14,7 @@ from panda3d.core import (
     NodePath,
 )
 import numpy as np
-from bot.core.spline import SplineModel, BEZIER_TYP, NURBS_TYP
+from bot.core.spline import SplineModel
 
 MASK_CURVE_PICK = BitMask32.bit(1)
 MASK_CP_PICK = BitMask32.bit(2)
@@ -43,9 +43,9 @@ class CurveApp:
         self._cp_geom_node: Optional[NodePath] = None
         self._cp_line_node: Optional[NodePath] = None
 
-        self.control_points: Optional[List] = None
-        self.degree: Optional[int] = None
-        self.knots: Optional[List] = None
+        # self.control_points: Optional[List] = None
+        # self.degree: Optional[int] = None
+        # self.knots: Optional[List] = None
 
         self.cp_visible: bool = False
         self.line_thickness: float = 2.0
@@ -54,15 +54,15 @@ class CurveApp:
         self.curve_pick_radius: float = 0.2
         self.cp_pick_radius: float = 0.4
 
-        if self.type in (BEZIER_TYP, NURBS_TYP):
-            self.control_points = curve_data.get("control_points", [])
+        self.control_points = curve_data.get("control_points", []) or None
+        if self.control_points is not None:
             self.cp_color = [
                 [0.5, 0.5, 0.5, 1.0] for _ in range(len(self.control_points))
             ]
-            self.degree = curve_data.get("degree")
+        self.degree = curve_data.get("degree")
+        self.knots = curve_data.get("knots") or None
+        self.weights = curve_data.get("weights") or None
 
-        if self.type == NURBS_TYP:
-            self.knots = curve_data.get("knots")
 
     # =========================================================================
     # VISUAL PART (RENDERING)
@@ -254,10 +254,11 @@ class CurveApp:
 
         self.control_points[cp_index] = [new_pos[0], new_pos[1], new_pos[2]]
 
-        if self.type == BEZIER_TYP and self.degree is not None:
+        if self.degree is not None:
             pts = SplineModel.preview_evaluate(
-                self.type, self.degree, np.array(self.control_points, dtype=np.float64)
+                self.type, self.degree, np.array(self.control_points, dtype=np.float64), knots=self.knots
             )
+
             if len(pts.shape) == 2 and pts.shape[0] in (2, 3) and pts.shape[1] > 3:
                 pts = pts.T
 

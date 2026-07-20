@@ -173,7 +173,6 @@ class Viewer:
             self._conn = None
 
         self._event_thread = None
-        print("Stopped Viewer")
 
     def add_callback(
         self, event_type: ViewEventType, callback: VisualCallback
