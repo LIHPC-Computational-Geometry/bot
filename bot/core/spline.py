@@ -97,5 +97,5 @@ class SplineModel(Observable):
         knots: list[float] = None,
     ) -> list[list[float]]:
         return ferrispline.PyModel().preview_evaluate(
-            type, degree, np.array(control_points, dtype=np.float64), weights, knots, 10
+            type, degree, (np.array(control_points, dtype=np.float64), weights, knots), 10
         )
