@@ -17,7 +17,7 @@ class SplineModel(Observable):
     def __init__(self):
         super().__init__()
         self._model = ferrispline.PyModel()
-        self.curves: [str] = []  # curves' tag
+        self.curves: [str] = []
 
     @staticmethod
     def _default_control_points(coords_a, coords_b, degree=3) -> list[list[float]]:
