@@ -33,7 +33,6 @@ class CurveApp:
         self.degree = curve_data.get("degree")
         self.weights = curve_data.get("weights") or None
 
-
         # ==========================================
         # NODEPATH VARIABLES
         # ==========================================
@@ -56,7 +55,6 @@ class CurveApp:
         self.knots_render_node: Optional[NodePath] = None
         self.knots_geom_node: Optional[NodePath] = None
 
-
         # ==========================================
         # CONTROLE POINTS
         # ==========================================
@@ -75,7 +73,8 @@ class CurveApp:
         self.knots = curve_data.get("knots") or None
         if self.knots is not None:
             self.knots_color = [
-                [0.8, 0.5, 0.2, 1.0] for _ in range(self.degree, len(self.knots) - self.degree)
+                [0.8, 0.5, 0.2, 1.0]
+                for _ in range(self.degree, len(self.knots) - self.degree)
             ]
 
         # ==========================================
@@ -121,7 +120,7 @@ class CurveApp:
                 pt = [
                     p1[0] + frac * (p2[0] - p1[0]),
                     p1[1] + frac * (p2[1] - p1[1]),
-                    p1[2] + frac * (p2[2] - p1[2])
+                    p1[2] + frac * (p2[2] - p1[2]),
                 ]
 
             vertex_writer.addData3f(*pt)
@@ -350,7 +349,10 @@ class CurveApp:
 
         if self.degree is not None:
             pts = SplineModel.preview_evaluate(
-                self.type, self.degree, np.array(self.control_points, dtype=np.float64), knots=self.knots
+                self.type,
+                self.degree,
+                np.array(self.control_points, dtype=np.float64),
+                knots=self.knots,
             )
 
             if len(pts.shape) == 2 and pts.shape[0] in (2, 3) and pts.shape[1] > 3:

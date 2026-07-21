@@ -84,12 +84,8 @@ class CurveGeometry(TypedDict):
     cp_vertices: NotRequired[
         bytes
     ]  # Flat float32 byte array of xyz coordinates for the control points.
-    knots: NotRequired[
-        bytes
-    ]
-    weights: NotRequired[
-        bytes
-    ]
+    knots: NotRequired[bytes]
+    weights: NotRequired[bytes]
 
 
 class CurveDelta(TypedDict):
