@@ -8,7 +8,6 @@ from bot.core.observable import Observable
 BEZIER_TYP = "bezier"
 NURBS_TYP = "nurbs"
 
-ferris = ferrispline.PyModel()
 
 
 class SplineModel(Observable):
@@ -18,7 +17,7 @@ class SplineModel(Observable):
 
     def __init__(self):
         super().__init__()
-        self._model = ferris
+        self._model = ferrispline.PyModel()
         self.curves: [str] = []
         self.scale_factor: float = 1.0
 
@@ -123,7 +122,7 @@ class SplineModel(Observable):
         weights: list[float] = None,
         knots: list[float] = None,
     ) -> list[list[float]]:
-        return ferris.preview_evaluate(
+        return ferrispline.PyModel().preview_evaluate(
             type,
             degree,
             (np.array(control_points, dtype=np.float64), weights, knots),
