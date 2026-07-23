@@ -16,7 +16,10 @@ from __future__ import annotations
 
 import sys
 
-from bot.control.shortcuts import Drag, Hold, Key, Wheel, bind, registry
+from direct.gui.OnscreenText import OnscreenText
+from panda3d.core import TextNode
+
+from bot.control.shortcuts import Key, Seq, Wheel, Drag, Hold, Click, bind, registry
 from bot.viewer.contracts import ViewEventType  # noqa: F401 — re-export for domain handlers
 
 # Importing this module registers all handlers on the default ``registry``.
@@ -133,3 +136,54 @@ def pan_drag(ctx, delta):
     ):
         return
     ctx.messenger.send("cmd_pan", [delta.x, delta.y])
+
+def _format_binding(b) -> str:
+    """Traduit un objet Binding en texte lisible."""
+    if isinstance(b, Key):
+        return b.name.upper()
+    if isinstance(b, Seq):
+        return " puis ".join(k.upper() for k in b.keys)
+    if isinstance(b, Drag):
+        mods = f" + {'+'.join(b.modifiers).upper()}" if getattr(b, "modifiers", None) else ""
+        return f"Drag {b.button.upper()}{mods}"
+    if isinstance(b, Wheel):
+        mods = f" ({'+'.join(b.modifiers).upper()})" if getattr(b, "modifiers", None) else ""
+        return f"Molette {b.direction.upper()}{mods}"
+    if isinstance(b, Hold):
+        return f"Maintenir {', '.join(b.keys).upper()}"
+    if isinstance(b, Click):
+        mods = f" + {'+'.join(b.modifiers).upper()}" if getattr(b, "modifiers", None) else ""
+        return f"Clic {b.button.upper()}{mods}"
+    return "Inconnu"
+
+@bind(Key("h"), scope="local")
+def toggle_help(ctx):
+    """Affiche ou masque la liste des raccourcis."""
+    # 1. Si le menu existe déjà, on le détruit (comportement Toggle)
+    if hasattr(ctx.base, "_help_ui") and ctx.base._help_ui is not None:
+        ctx.base._help_ui.destroy()
+        ctx.base._help_ui = None
+        return
+
+    # 2. Génération du texte à partir du registre
+    lines = ["--- RACCOURCIS CLAVIER / SOURIS ---", ""]
+
+    # On boucle sur la liste des entrées du registre
+    for entry in registry.entries():
+        # Utilise la docstring de la fonction si elle existe, sinon le nom de la fonction
+        desc = entry.fn.__doc__ or entry.fn.__name__.replace("_", " ").capitalize()
+        # Formatage avec un espacement fixe pour aligner les descriptions
+        lines.append(f"• {_format_binding(entry.binding):<20} : {desc}")
+
+    help_text = "\n".join(lines)
+
+    # 3. Affichage propre avec OnscreenText
+    ctx.base._help_ui = OnscreenText(
+        text=help_text,
+        parent=ctx.base.a2dTopLeft,  # Ancrage natif dans le coin supérieur gauche
+        pos=(0.05, -0.1),            # Petite marge depuis le bord
+        scale=0.045,                 # Taille du texte
+        fg=(1, 1, 1, 1),             # Texte blanc opaque
+        bg=(0.1, 0.1, 0.1, 0.85),    # Fond gris foncé semi-transparent
+        align=TextNode.ALeft         # Alignement à gauche
+    )
