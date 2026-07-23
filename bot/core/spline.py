@@ -9,7 +9,6 @@ BEZIER_TYP = "bezier"
 NURBS_TYP = "nurbs"
 
 
-
 class SplineModel(Observable):
     """
     Public curve wrapper backed by ferrispline.PyModel.
