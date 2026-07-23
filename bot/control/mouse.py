@@ -271,6 +271,3 @@ class MouseHandler:
 
         self._left_was_down = left_down
         return task.cont
-
-    def is_shift_down(self) -> bool:
-        return inputState.isSet("shift")

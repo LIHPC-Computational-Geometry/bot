@@ -290,19 +290,6 @@ class CameraController:
         # On lance et on déverrouille à la fin
         Sequence(self.transition, Func(self._unlock)).start()
 
-        # Parallel(
-        #     self.focal_node.hprInterval(duration, target_hpr, blendType='easeInOut'),
-        #     self.focal_node.posInterval(duration, center, blendType='easeInOut'),
-        #     LerpFunc(lambda s: self.lens.setFilmSize(s),
-        #              fromData=self.lens.getFilmSize().getX(),
-        #              toData=max_dim * 1.5,
-        #              duration=duration,
-        #              blendType='easeInOut'),
-        #     name="AlignAnimation"
-        # ).start()
-
-        # taskMgr.doMethodLater(duration, self._unlock, "UnlockTask")
-
     def update_task(self, task):
         """
         Per-frame task: keep the pivot marker and gizmo in sync with the camera.

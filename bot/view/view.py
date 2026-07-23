@@ -11,7 +11,6 @@ from bot.view.scene import Scene
 from bot.viewer.serialize import payload_to_geom_data
 from bot.control.camera import CameraController
 from bot.control.mouse import MouseHandler
-from bot.control.keyboard import KeyboardHandler
 from bot.control.shortcuts import InputContext
 from bot.control.shortcuts_registry import registry as shortcut_registry
 from bot.viewer.contracts import ScenePayload, SceneUpdateOp, ViewerCommandType
@@ -59,7 +58,6 @@ class View(ShowBase):
 
         self._config = self.__load_config(config_filename)
 
-        self.kb_handler = KeyboardHandler(self)
         self.mouse_handler = MouseHandler(self)
         self.axis_constraint_mask = 7
         self.accept("cmd_axis_constraint", self.__on_axis_constraint_cmd)
