@@ -79,6 +79,9 @@ class TestMouseDragSession(unittest.TestCase):
         """Creates a pre-configured MouseHandler for testing drag sessions."""
         handler = MouseHandler.__new__(MouseHandler)
         handler.base = _FakeBase()
+
+        handler.gesture_tracker = None
+
         handler.constraints = ConstraintManager(handler.base)
         handler.picker = MagicMock()
 

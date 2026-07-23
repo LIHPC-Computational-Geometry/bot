@@ -57,3 +57,4 @@ The following table details the most common events you can attach callbacks to:
 | `CP_PICK_START` | `{"curve_tag": str, "cp_index": int, "world_pos": [...]}` | Freeze global history undo stacks or record structural pre-states. |
 | `CP_PICK_END` | `{"curve_tag": str, "cp_index": int, "world_pos": [...]}` | Commit the finalized drag movement to the mathematical model kernel. |
 | `PICK` | `{"world_pos": [x, y, z]}` | Instantiate new custom points, nodes, or primitives at absolute locations. |
+| `SHORTCUT` | `{"action": str, ...}` | React to domain shortcuts declared with `@bind(..., scope="domain")`. |

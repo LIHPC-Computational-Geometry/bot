@@ -12,6 +12,8 @@ from bot.viewer.serialize import payload_to_geom_data
 from bot.control.camera import CameraController
 from bot.control.mouse import MouseHandler
 from bot.control.keyboard import KeyboardHandler
+from bot.control.shortcuts import InputContext
+from bot.control.shortcuts_registry import registry as shortcut_registry
 from bot.viewer.contracts import ScenePayload, SceneUpdateOp, ViewerCommandType
 
 _DEFAULT_SCENE = {
@@ -53,6 +55,7 @@ class View(ShowBase):
         self._on_event_cb = on_event_cb
         self._scene = None
         self._camera_controller = None
+        self._config_filename = config_filename
 
         self._config = self.__load_config(config_filename)
 
@@ -60,6 +63,18 @@ class View(ShowBase):
         self.mouse_handler = MouseHandler(self)
         self.axis_constraint_mask = 7
         self.accept("cmd_axis_constraint", self.__on_axis_constraint_cmd)
+        self.accept("cmd_hot_reload", self.__on_hot_reload)
+
+        shortcut_registry.install(
+            InputContext(
+                base=self,
+                scene=self._scene,
+                mouse_handler=self.mouse_handler,
+                on_event_cb=self._on_event_cb,
+                camera_controller=self._camera_controller,
+            )
+        )
+        self.mouse_handler.set_gesture_tracker(shortcut_registry.gesture_tracker)
 
         self.hud = OnscreenText(
             text="", pos=(-1.3, -0.5), scale=0.06, fg=(1, 1, 1, 1), align=TextNode.ALeft
@@ -155,6 +170,15 @@ class View(ShowBase):
     def __on_axis_constraint_cmd(self, mask: int):
         self.__set_axis_constraint(mask)
 
+    def __on_hot_reload(self):
+        """Reload TOML config from disk and apply to scene / camera."""
+        self._config = self.__load_config(self._config_filename)
+        if self._scene:
+            self._scene.apply_settings(self.__scene_cfg())
+        if self._camera_controller:
+            self._camera_controller.apply_settings(self.__camera_cfg())
+        self.hud.setText("Config reloaded.")
+
     def __load_scene(self, payload: dict):
         """Load (or reload) the scene from an add payload or legacy geom_data."""
         if self._scene is not None:
@@ -167,6 +191,7 @@ class View(ShowBase):
 
         self._scene = Scene(self, geom_data, self.__scene_cfg())
         self._scene.set_axis_constraint(self.axis_constraint_mask)
+        shortcut_registry.update_context(scene=self._scene)
 
         if self._camera_controller is None:
             self._camera_controller = CameraController(
@@ -175,6 +200,7 @@ class View(ShowBase):
         else:
             self._camera_controller.scene = self._scene
 
+        shortcut_registry.update_context(camera_controller=self._camera_controller)
         self._camera_controller.recenter()
 
     def __update_scene(self, payload: dict):

@@ -48,9 +48,15 @@ class CameraController:
         self.base.accept("cmd_center", self.recenter)
         self.base.accept("cmd_zoom", self.handle_zoom)
         self.base.accept("cmd_align_plane", self.align_to_plane)
+        self.base.accept("cmd_toggle_marker", self.toggle_marker)
 
         # Vitesse de déplacement au clavier
         self.key_pan_speed = 2.0
+
+        show_marker = bool(settings.get("show_marker_at_start", False))
+        self._marker_visible = show_marker
+        if not show_marker:
+            self.marker.hide()
 
         # Task pour maintenir le marqueur et le gizmo
         self.base.taskMgr.add(self.update_task, "CameraUpdateTask")
@@ -109,6 +115,23 @@ class CameraController:
             ls.moveTo(0, 0, 0)
             ls.drawTo(v)
         return NodePath(ls.create())
+
+    def toggle_marker(self):
+        """Show or hide the camera pivot marker."""
+        self._marker_visible = not getattr(self, "_marker_visible", True)
+        if self._marker_visible:
+            self.marker.show()
+        else:
+            self.marker.hide()
+
+    def apply_settings(self, settings: dict):
+        """Apply camera settings from config (speeds, marker visibility)."""
+        if "show_marker_at_start" in settings:
+            self._marker_visible = bool(settings["show_marker_at_start"])
+            if self._marker_visible:
+                self.marker.show()
+            else:
+                self.marker.hide()
 
     def handle_rotate(self, dx, dy):
         """

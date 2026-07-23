@@ -298,13 +298,32 @@ See the complete extension walkthrough in [custom_model.md](custom_model.md).
 
 ### 4.8 Keyboard shortcuts
 
-From `bot/control/keyboard.py`:
+Source of truth: [`bot/control/shortcuts_registry.py`](../bot/control/shortcuts_registry.py).
+
+All shortcuts are declared with `@bind(...)` on the shared registry. Adding a
+command is a three-line change:
+
+```python
+from bot.control.shortcuts import bind, Key
+
+@bind(Key("n"), scope="domain")   # or scope="local"
+def new_point(ctx):
+    return {"action": "new_point"}  # domain → ViewEventType.SHORTCUT
+```
+
+- **local**: runs in the Panda3D child (camera, HUD, scene).
+- **domain**: emits `ViewEventType.SHORTCUT` to the parent (payload `{"action": str, ...}`).
+
+Built-in bindings:
 
 - `c`: center camera
 - `alt-x`, `alt-y`, `alt-z`: align camera plane
 - `x`, `y`, `z`, `shift-x`, `shift-y`, `shift-z`, `0..7`: axis-constraint masks
 - Arrow keys: smooth pan
-- `f5`: hot reload
+- Left drag: pan
+- Mouse wheel: zoom
+- `f5`: hot reload config from disk
+- `p`: toggle camera pivot marker
 - `escape`: exit
 
 ## 5. Development and CI/CD
