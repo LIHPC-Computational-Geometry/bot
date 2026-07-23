@@ -10,6 +10,7 @@ NURBS_TYP = "nurbs"
 
 ferris = ferrispline.PyModel()
 
+
 class SplineModel(Observable):
     """
     Public curve wrapper backed by ferrispline.PyModel.
@@ -19,6 +20,21 @@ class SplineModel(Observable):
         super().__init__()
         self._model = ferris
         self.curves: [str] = []
+        self.scale_factor: float = 1.0
+
+    def match_cad_scale(self, cad_model) -> None:
+        """
+        Automatically calculates and sets the scale factor based on the CAD model's bounding box size.
+        Assumes the baseline spline size is approximately 10 units.
+
+        Args:
+            cad_model: The loaded CADModel instance containing geometric bounds.
+        """
+        max_size = max(cad_model.bounds.get("size", [1.0, 1.0, 1.0]))
+        if max_size > 0:
+            self.scale_factor = max_size / 10.0
+        else:
+            self.scale_factor = 1.0
 
     @staticmethod
     def _default_control_points(coords_a, coords_b, degree=3) -> list[list[float]]:
@@ -43,17 +59,26 @@ class SplineModel(Observable):
         weights: list[float] = None,
         knots: list[float] = None,
     ) -> str:
+        """
+        Adds a new curve to the model.
+        Automatically scales the control points using the model's scale_factor.
+        """
+        scaled_cp = [
+            [x * self.scale_factor, y * self.scale_factor, z * self.scale_factor]
+            for x, y, z in control_points
+        ]
+
         if type == BEZIER_TYP:
             self._notify_observers()
             tag = self._model.create_bezier(
-                degree, np.array(control_points, dtype=np.float64), weights
+                degree, np.array(scaled_cp, dtype=np.float64), weights
             )
             self.curves.append(tag)
             return tag
         elif type == NURBS_TYP:
             self._notify_observers()
             tag = self._model.create_nurbs(
-                degree, np.array(control_points, dtype=np.float64), knots, weights
+                degree, np.array(scaled_cp, dtype=np.float64), knots, weights
             )
             self.curves.append(tag)
             return tag
