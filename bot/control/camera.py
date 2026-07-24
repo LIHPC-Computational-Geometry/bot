@@ -12,7 +12,6 @@ class CameraController:
     ``cmd_zoom``, ``cmd_center`` and ``cmd_align_plane``.
     """
 
-    # TODO: check settings maybe a configuration error
     def __init__(self, base, scene, settings):
         """
         Set up the orthographic camera and its node hierarchy.
@@ -95,9 +94,8 @@ class CameraController:
 
         # 6. Ajuster la profondeur de rendu (Near/Far)
         # Très important pour ne pas que l'objet soit "tronçonné"
-        limit = max(100.0, self.model_radius * 5)
-        self.lens.setNear(-limit)
-        self.lens.setFar(limit)
+        self.lens.setNear(self.model_radius)
+        self.lens.setFar(self.model_radius * 3)
 
     def create_marker(self):
         """
@@ -201,9 +199,8 @@ class CameraController:
 
             # NOTE: J'ai réduit le max pour résoudre un problème de précision mathématique des Float32.
             # La taille de limit d'origine était beaucoup trop grande max(10000.0, self.model_radius * 100.0)
-            limit = max(100.0, self.model_radius * 5)
-            self.lens.setNear(-limit)
-            self.lens.setFar(limit)
+            self.lens.setNear(self.model_radius)
+            self.lens.setFar(self.model_radius * 3)
 
     def recenter(self):
         """

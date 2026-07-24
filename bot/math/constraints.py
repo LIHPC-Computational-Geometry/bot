@@ -55,7 +55,7 @@ class ConstraintManager:
         plane_normal = self._plane_normal_from_mask(mask)
         if plane_normal is not None:
             plane = Plane(plane_normal, Point3(*start))
-            ray_to = ray_origin + ray_dir * 100000.0
+            ray_to = ray_origin + ray_dir * 1e9
             hit = Point3()
             if plane.intersectsLine(hit, ray_origin, ray_to):
                 return [hit[0], hit[1], hit[2]]
@@ -89,9 +89,7 @@ class ConstraintManager:
             return None
 
         hit = Point3()
-        if self.drag_plane.intersectsLine(
-            hit, ray_origin, ray_origin + ray_dir * 1000000.0
-        ):
+        if self.drag_plane.intersectsLine(hit, ray_origin, ray_origin + ray_dir * 1e9):
             return [hit[0], hit[1], hit[2]]
         return None
 
