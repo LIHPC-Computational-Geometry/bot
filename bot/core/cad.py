@@ -221,10 +221,8 @@ class CADModel(Observable):
                 "the dim parameter must be an int comprised between 1 and 2."
             )
 
-        # NEW: Convert world coordinates to internal Gmsh coordinates
         local_coord = [c / self.scale_factor for c in coord]
         closest_local = gmsh.model.getClosestPoint(dim, tag, local_coord)[0]
-        # NEW: Convert back to world coordinates
         return [c * self.scale_factor for c in closest_local]
 
     def get_end_points(self, curve_tag):
@@ -287,7 +285,6 @@ class CADModel(Observable):
         # La dimension 0 correspond aux points dans l'API Gmsh.
         # gmsh.model.getValue(dimension, tag, parametric_coords)
         coords = gmsh.model.getValue(0, point_tag, [])
-        # NEW: Scale the output
         return [c * self.scale_factor for c in coords]
 
     def get_end_points_coords(self, point_tag) -> list[list[float]]:
