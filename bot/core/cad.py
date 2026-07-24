@@ -18,6 +18,7 @@ class CADModel(Observable):
         super().__init__()
         self.initialize()
         self.bounds = {"min": [0, 0, 0], "max": [0, 0, 0]}
+        self.scale_factor = 1.0
 
     def initialize(self):
         """

@@ -163,10 +163,14 @@ class TestClosestPointWorkflow(unittest.TestCase):
         self.cad.finalize()
 
     def test_closest_point_on_straight_line(self):
+        sf = self.cad.scale_factor
+
         # Curve 2 is the straight line from (0,1,0) to (5,1,0)
-        coords = [2, 0, 0, 4, 2, 0]
+        coords = [2 * sf, 0, 0, 4 * sf, 2 * sf, 0]
         result = self.cad.getClosestPoint(1, 2, coords)
-        oracle = [2, 1, 0, 4, 1, 0]
+
+        oracle = [2 * sf, 1 * sf, 0, 4 * sf, 1 * sf, 0]
+
         for v1, v2 in zip(oracle, result):
             self.assertAlmostEqual(v1, v2, delta=1e-9)
 
