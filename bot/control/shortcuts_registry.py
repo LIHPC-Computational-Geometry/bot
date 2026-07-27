@@ -107,6 +107,16 @@ def toggle_marker(ctx):
     ctx.messenger.send("cmd_toggle_marker")
 
 
+@bind(Key("n"), scope="local")
+def create_mode(ctx):
+    ctx.messenger.send("cmd_create_mode")
+
+
+@bind(Key("d"), scope="domain")
+def delete_mode(ctx):
+    return {"action": "cmd_delete_mode"}
+
+
 @bind(Hold("arrow_left", "arrow_right", "arrow_up", "arrow_down"), scope="local")
 def arrow_pan(ctx, keys: dict):
     dx = keys.get("arrow_right", 0) - keys.get("arrow_left", 0)

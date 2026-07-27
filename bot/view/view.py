@@ -10,7 +10,7 @@ from panda3d.core import TextNode
 from bot.view.scene import Scene
 from bot.viewer.serialize import payload_to_geom_data
 from bot.control.camera import CameraController
-from bot.control.mouse import MouseHandler
+from bot.control.mouse import MouseHandler, CursorManager
 from bot.control.shortcuts import InputContext
 from bot.control.shortcuts_registry import registry as shortcut_registry
 from bot.viewer.contracts import ScenePayload, SceneUpdateOp, ViewerCommandType
@@ -59,9 +59,12 @@ class View(ShowBase):
         self._config = self.__load_config(config_filename)
 
         self.mouse_handler = MouseHandler(self)
+        self.cursor = CursorManager(self)
+
         self.axis_constraint_mask = 7
         self.accept("cmd_axis_constraint", self.__on_axis_constraint_cmd)
         self.accept("cmd_hot_reload", self.__on_hot_reload)
+        self.accept("cmd_create_mode", self._create_mode)
 
         shortcut_registry.install(
             InputContext(
@@ -167,6 +170,12 @@ class View(ShowBase):
 
     def __on_axis_constraint_cmd(self, mask: int):
         self.__set_axis_constraint(mask)
+
+    def _create_mode(self):
+        self.cursor.set_cursor_mode()
+        if self._scene:
+            self.hud.setText("Create mode enabled.")
+
 
     def __on_hot_reload(self):
         """Reload TOML config from disk and apply to scene / camera."""
