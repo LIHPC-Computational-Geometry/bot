@@ -305,7 +305,7 @@ class Viewer:
             match cmd:
                 case ViewerCommandType.HIGHLIGHT_CURVE:
                     self.highlight_curve(
-                        command["tag"], command.get("color", [1, 1, 1, 1])
+                        command["tag"], command.get("color", [1, 0, 1, 1])
                     )
                 case ViewerCommandType.UPDATE_HUD:
                     self.set_hud_text(command.get("text", ""))

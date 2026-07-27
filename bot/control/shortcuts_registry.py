@@ -174,7 +174,7 @@ def _format_binding(b) -> str:
 
 @bind(Key("h"), scope="local")
 def toggle_help(ctx):
-    """Show or hide this help menu."""
+    """Toggle help menu."""
     if hasattr(ctx.base, "_help_ui") and ctx.base._help_ui is not None:
         ctx.base._help_ui.destroy()
         ctx.base._help_ui = None

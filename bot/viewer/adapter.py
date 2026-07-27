@@ -60,7 +60,19 @@ class Adapter(Protocol):
         ...
 
 
-class CADAdapter:
+class BaseAdapter:
+    """
+    """
+
+    def __init__(self):
+        self._update_callback: Callable[[ScenePayload], None] | None = None
+        self._last_hovered: str | None = None
+        self.color = [1, 0, 1, 1]
+        self.hover_color = [1, 0.5, 0, 1]
+
+
+
+class CADAdapter(BaseAdapter):
     """
     Adapter bridging a CADModel to the Viewer IPC layer.
 
@@ -68,9 +80,8 @@ class CADAdapter:
     """
 
     def __init__(self, model: CADModel):
+        super().__init__()
         self._model = model
-        self._update_callback: Callable[[ScenePayload], None] | None = None
-        self._last_hovered: str | None = None
         self._model.add_observer(self)
 
     def bind_update(self, callback: Callable[[ScenePayload], None]) -> None:
@@ -195,7 +206,7 @@ class CADAdapter:
                     {
                         "cmd": ViewerCommandType.HIGHLIGHT_CURVE,
                         "tag": self._last_hovered,
-                        "color": [1, 1, 1, 1],
+                        "color": self.color,
                     }
                 )
 
@@ -220,7 +231,7 @@ class CADAdapter:
                     {
                         "cmd": ViewerCommandType.HIGHLIGHT_CURVE,
                         "tag": tag_str,
-                        "color": [1, 0.5, 0, 1],
+                        "color": self.hover_color,
                     },
                 ]
             )
@@ -231,7 +242,7 @@ class CADAdapter:
                     {
                         "cmd": ViewerCommandType.HIGHLIGHT_CURVE,
                         "tag": self._last_hovered,
-                        "color": [1, 1, 1, 1],
+                        "color": self.color,
                     }
                 )
                 commands.append(
@@ -259,7 +270,7 @@ class CADAdapter:
         ]
 
 
-class SplineAdapter:
+class SplineAdapter(BaseAdapter):
     """
     Adapter bridging a SplineModel to the Viewer IPC layer.
 
@@ -269,8 +280,8 @@ class SplineAdapter:
     _SAMPLE_COUNT = 100
 
     def __init__(self, model: SplineModel):
+        super().__init__()
         self._model = model
-        self._update_callback: Callable[[ScenePayload], None] | None = None
         self._model.add_observer(self)
 
     def bind_update(self, callback: Callable[[ScenePayload], None]) -> None:
