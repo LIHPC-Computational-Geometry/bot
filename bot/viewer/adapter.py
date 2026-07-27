@@ -70,6 +70,13 @@ class BaseAdapter:
         self.color = [1, 0, 1, 1]
         self.hover_color = [1, 0.5, 0, 1]
 
+    def bind_update(self, callback: Callable[[ScenePayload], None]) -> None:
+        """Register a callback invoked when the CAD model changes."""
+        self._update_callback = callback
+
+    def unbind_update(self) -> None:
+        """Clear the update callback."""
+        self._update_callback = None
 
 
 class CADAdapter(BaseAdapter):
@@ -84,13 +91,6 @@ class CADAdapter(BaseAdapter):
         self._model = model
         self._model.add_observer(self)
 
-    def bind_update(self, callback: Callable[[ScenePayload], None]) -> None:
-        """Register a callback invoked when the CAD model changes."""
-        self._update_callback = callback
-
-    def unbind_update(self) -> None:
-        """Clear the update callback."""
-        self._update_callback = None
 
     def get_delta_load(self) -> ScenePayload:
         """Build the initial add payload with curves, bounds, and flat topology."""
@@ -281,16 +281,9 @@ class SplineAdapter(BaseAdapter):
 
     def __init__(self, model: SplineModel):
         super().__init__()
+        self.color = [0, 1, 1, 1]
         self._model = model
         self._model.add_observer(self)
-
-    def bind_update(self, callback: Callable[[ScenePayload], None]) -> None:
-        """Register a callback invoked when the spline model changes."""
-        self._update_callback = callback
-
-    def unbind_update(self) -> None:
-        """Clear the update callback."""
-        self._update_callback = None
 
     def get_delta_load(self) -> ScenePayload:
         """Build the initial add payload with all spline curves."""
@@ -302,12 +295,17 @@ class SplineAdapter(BaseAdapter):
     def handle_event(self, event: ViewEvent) -> list[ViewerCommand]:
         """Dispatch selection and control-point drag events for spline curves."""
         event_type = event.get("event_type", "")
+        tag = event.get("tag") or event.get("curve_tag")
+
+        if event_type == ViewEventType.HOVER:
+                tag_str = str(tag) if tag is not None else None
+                return self.__handle_hover(tag_str)
+
         local_id = self.__resolve_spline_tag(event)
         if local_id is None:
             return []
 
         ns_tag = encode(SPLINE_NS, local_id)
-
         match event_type:
             case ViewEventType.CURVE_SELECTED:
                 return self.__handle_curve_selected(ns_tag)
@@ -407,6 +405,63 @@ class SplineAdapter(BaseAdapter):
             _logger.warning("Spline cp_pick_end failed: %s", exc)
         return []
 
+    def __handle_hover(self, tag: str | None) -> list[ViewerCommand]:
+        """Update HUD text and curve highlight on hover enter/leave."""
+        commands: list[ViewerCommand] = []
+        if tag:
+            if self._last_hovered and self._last_hovered != tag:
+                commands.append(
+                    {
+                        "cmd": ViewerCommandType.HIGHLIGHT_CURVE,
+                        "tag": self._last_hovered,
+                        "color": self.color,
+                    }
+                )
+
+            info_text = f"--- Curve {tag} ---\n"
+            if decode(tag)[1] in self._model.curves:
+                namespace, local_id = decode(tag)
+            else:
+                local_id = None
+            if local_id is not None:
+                try:
+
+                    info_text += f"Type: {namespace}\n"
+                    info_text += f"Degree: {self._model.get_degree(local_id)}\n"
+                except Exception as exc:
+                    info_text += f"Error: {exc}"
+            else:
+                info_text += "Type: unknown"
+
+            commands.extend(
+                [
+                    {"cmd": ViewerCommandType.UPDATE_HUD, "text": info_text},
+                    {
+                        "cmd": ViewerCommandType.HIGHLIGHT_CURVE,
+                        "tag": tag,
+                        "color": self.hover_color,
+                    },
+                ]
+            )
+            self._last_hovered = tag
+        else:
+            if self._last_hovered:
+                commands.append(
+                    {
+                        "cmd": ViewerCommandType.HIGHLIGHT_CURVE,
+                        "tag": self._last_hovered,
+                        "color": self.color,
+                    }
+                )
+                commands.append(
+                    {
+                        "cmd": ViewerCommandType.UPDATE_HUD,
+                        "text": "Ready. Hover or click on curves.",
+                    }
+                )
+                self._last_hovered = None
+        return commands
+
 
 class CompositeAdapter:
     """
@@ -454,6 +509,14 @@ class CompositeAdapter:
     def handle_event(self, event: ViewEvent) -> list[ViewerCommand]:
         """Route an event to the adapter matching the tag namespace."""
         tag = event.get("curve_tag") or event.get("tag")
+        event_type = event.get("event_type", "")
+        if tag is None and event_type == ViewEventType.HOVER:
+            commands = []
+            for adapter in self._adapters.values():
+                commands.extend(adapter.handle_event(event))
+            return commands
+
+
         if tag is not None and is_namespaced(str(tag)):
             ns = prefix(str(tag))
             if ns is not None:
