@@ -116,40 +116,26 @@ class View(ShowBase):
         while not self._cmd_queue.empty():
             try:
                 cmd, data = self._cmd_queue.get_nowait()
-                if cmd == SceneUpdateOp.ADD:
-                    self.__load_scene(data)
-                elif cmd == SceneUpdateOp.UPDATE:
-                    self.__update_scene(data)
-                elif cmd == SceneUpdateOp.DELETE:
-                    self.__delete_in_scene(data)
-                elif cmd == ViewerCommandType.RELOAD_CONFIG:
-                    self._config = data
-                    if self._scene:
-                        self._scene.apply_settings(self.__scene_cfg())
-                    if self._camera_controller:
-                        self._camera_controller.apply_settings(self.__camera_cfg())
-                elif cmd == ViewerCommandType.HIGHLIGHT_CURVE:
-                    if self._scene:
-                        self._scene.set_curve_color(data["tag"], data["color"])
-                elif cmd == ViewerCommandType.UPDATE_HUD:
-                    self.hud.setText(data["text"])
-                elif cmd == ViewerCommandType.SET_EDIT_MODE:
-                    enabled = bool(data.get("enabled", False))
-                    curve_tag = data.get("curve_tag")
-                    self.mouse_handler.set_edit_mode(enabled, curve_tag)
-                    if self._scene:
-                        self._scene.set_edit_mode(enabled)
-                        if curve_tag is not None:
-                            self._scene.set_active_curve(curve_tag)
-                elif cmd == ViewerCommandType.SET_ACTIVE_CURVE:
-                    curve_tag = data.get("curve_tag")
-                    self.mouse_handler.set_edit_mode(
-                        self.mouse_handler.edit_mode_enabled, curve_tag
-                    )
-                    if self._scene:
-                        self._scene.set_active_curve(curve_tag)
-                elif cmd == ViewerCommandType.SET_AXIS_CONSTRAINT:
-                    self.__set_axis_constraint(data.get("mask", 7))
+                match cmd:
+                    case SceneUpdateOp.ADD:
+                        self.__load_scene(data)
+                    case SceneUpdateOp.UPDATE:
+                        self.__update_scene(data)
+                    case SceneUpdateOp.DELETE:
+                        self.__delete_in_scene(data)
+                    case ViewerCommandType.RELOAD_CONFIG:
+                        self.__reaload_config(data)
+                    case ViewerCommandType.HIGHLIGHT_CURVE:
+                        if self._scene:
+                            self._scene.set_curve_color(data["tag"], data["color"])
+                    case ViewerCommandType.UPDATE_HUD:
+                        self.hud.setText(data["text"])
+                    case ViewerCommandType.SET_EDIT_MODE:
+                        self.__set_edit_mode(data)
+                    case ViewerCommandType.SET_ACTIVE_CURVE:
+                        self.__set_active_curve(data)
+                    case ViewerCommandType.SET_AXIS_CONSTRAINT:
+                        self.__set_axis_constraint(data.get("mask", 7))
             except queue.Empty:
                 break
         return task.cont
@@ -237,3 +223,27 @@ class View(ShowBase):
         tags = payload.get("deleted_curves", [])
         if tags:
             self._scene.remove_curves([str(t) for t in tags])
+
+    def __reaload_config(self, payload: ScenePayload):
+        self._config = payload
+        if self._scene:
+            self._scene.apply_settings(self.__scene_cfg())
+        if self._camera_controller:
+            self._camera_controller.apply_settings(self.__camera_cfg())
+
+    def __set_edit_mode(self, payload: ScenePayload):
+        enabled = bool(payload.get("enabled", False))
+        curve_tag = payload.get("curve_tag")
+        self.mouse_handler.set_edit_mode(enabled, curve_tag)
+        if self._scene:
+            self._scene.set_edit_mode(enabled)
+            if curve_tag is not None:
+                self._scene.set_active_curve(curve_tag)
+
+    def __set_active_curve(self, payload: ScenePayload):
+        curve_tag = payload.get("curve_tag")
+        self.mouse_handler.set_edit_mode(
+            self.mouse_handler.edit_mode_enabled, curve_tag
+        )
+        if self._scene:
+            self._scene.set_active_curve(curve_tag)
