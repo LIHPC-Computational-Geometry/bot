@@ -174,7 +174,11 @@ class View(ShowBase):
     def _create_mode(self):
         self.cursor.set_cursor_mode()
         if self._scene:
-            self.hud.setText("Create mode enabled.")
+            if self.cursor.is_custom:
+                self.hud.setText("Create mode enabled.")
+            else:
+                self.hud.setText("Create mode disabled.")
+
 
 
     def __on_hot_reload(self):
