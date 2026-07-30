@@ -7,7 +7,8 @@ and turn ``ViewEvent`` interactions into ``ViewerCommand`` responses.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 from bot.core.cad import CADModel
 from bot.core.spline import BEZIER_TYP, NURBS_TYP, SplineModel

@@ -1,4 +1,4 @@
-from typing import Any, dict, list
+from typing import Any
 
 from panda3d.core import (
     AmbientLight,
