@@ -19,7 +19,7 @@ import sys
 from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import TextNode
 
-from bot.control.shortcuts import Key, Seq, Wheel, Drag, Hold, Click, bind, registry
+from bot.control.shortcuts import Click, Drag, Hold, Key, Seq, Wheel, bind, registry
 
 # Importing this module registers all handlers on the default ``registry``.
 __all__ = ["registry"]

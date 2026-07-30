@@ -1,10 +1,10 @@
 from direct.showbase.InputStateGlobal import inputState
 from panda3d.core import MouseButton, Point2, Point3
 
-from bot.control.picker import RayPicker
-from bot.viewer.contracts import ViewEventType
-from bot.math.constraints import ConstraintManager
 from bot.control.cursor_manager import CursorManager
+from bot.control.picker import RayPicker
+from bot.math.constraints import ConstraintManager
+from bot.viewer.contracts import ViewEventType
 
 
 class MouseHandler:
@@ -217,9 +217,8 @@ class MouseHandler:
         if self.dragging_cp or not left_down or self._left_was_down:
             return
 
-        if self.edit_mode_enabled:
-            if self.picker.pick_entry(m_pos, "cp") is not None:
-                return
+        if self.edit_mode_enabled and self.picker.pick_entry(m_pos, "cp") is not None:
+            return
 
         entry = self.picker.pick_entry(m_pos, "curve")
         if entry is None:

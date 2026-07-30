@@ -7,7 +7,7 @@ and turn ``ViewEvent`` interactions into ``ViewerCommand`` responses.
 from __future__ import annotations
 
 import logging
-from typing import Callable, Protocol
+from collections.abc import Callable, Protocol
 
 from bot.core.cad import CADModel
 from bot.core.spline import BEZIER_TYP, NURBS_TYP, SplineModel
@@ -44,19 +44,15 @@ class Adapter(Protocol):
 
     def bind_update(self, callback: Callable[[ScenePayload], None]) -> None:
         """Register a callback invoked when the underlying model changes."""
-        ...
 
     def unbind_update(self) -> None:
         """Clear the update callback."""
-        ...
 
     def get_delta_load(self) -> ScenePayload:
         """Return the full scene payload used for initial load."""
-        ...
 
     def handle_event(self, event: ViewEvent) -> list[ViewerCommand]:
         """Translate a user interaction into viewer commands."""
-        ...
 
 
 class BaseAdapter:
@@ -193,7 +189,7 @@ class CADAdapter(BaseAdapter):
                 if world_pos is not None:
                     try:
                         self._model.add_point(list(world_pos))
-                    except Exception as exc:
+                    except Exception() as exc:
                         _logger.warning("CAD pick add_point failed: %s", exc)
                 return []
             case _:
@@ -237,12 +233,8 @@ class CADAdapter(BaseAdapter):
             coords_a, coords_b = self._model.get_end_points_coords(local_id)
             pt_a = f"({coords_a[0]:.2f}, {coords_a[1]:.2f}, {coords_a[2]:.2f})"
             pt_b = f"({coords_b[0]:.2f}, {coords_b[1]:.2f}, {coords_b[2]:.2f})"
-            return (
-                "Type: linear segment\n"
-                f"Endpoint A: {pt_a}\n"
-                f"Endpoint B: {pt_b}"
-            )
-        except Exception as exc:
+            return f"Type: linear segment\nEndpoint A: {pt_a}\nEndpoint B: {pt_b}"
+        except Exception() as exc:
             return f"Error: {exc}"
 
     def _build_changed_curves(self) -> dict[str, CurveDelta]:
@@ -259,7 +251,7 @@ class CADAdapter(BaseAdapter):
                     curve_type="linear",
                     edges=local_edges,
                 )
-        except Exception as exc:
+        except Exception() as exc:
             _logger.warning("CADAdapter failed to build curves: %s", exc)
         return changed
 
@@ -362,7 +354,7 @@ class SplineAdapter(BaseAdapter):
         try:
             degree = self._model.get_degree(local_id)
             return f"Type: {namespace}\nDegree: {degree}"
-        except Exception as exc:
+        except Exception() as exc:
             return f"Error: {exc}"
 
     def _build_all_spline_curves(self) -> dict[str, CurveDelta]:
@@ -396,7 +388,7 @@ class SplineAdapter(BaseAdapter):
                 weights=weights,
                 edges=edges,
             )
-        except Exception as exc:
+        except Exception() as exc:
             _logger.warning("SplineAdapter failed to build curve %s: %s", local_id, exc)
             return None
 
@@ -410,7 +402,7 @@ class SplineAdapter(BaseAdapter):
             return []
         try:
             self._model.move_control_point(local_id, cp_index, world_pos)
-        except Exception as exc:
+        except Exception() as exc:
             _logger.warning("Spline cp_pick_end failed: %s", exc)
         return []
 

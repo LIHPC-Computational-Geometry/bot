@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import Any, Literal, NotRequired, TypedDict, Union
+from typing import Any, Literal, NotRequired, TypedDict
 
 from bot.core.spline import BEZIER_TYP, NURBS_TYP
 
@@ -179,15 +179,15 @@ class EventShortcut(TypedDict):
     action: str
 
 
-ViewEvent = Union[
-    EventHover,
-    EventCurveSelected,
-    EventCPPickStart,
-    EventCPDrag,
-    EventCPPickEnd,
-    EventPick,
-    EventShortcut,
-]
+ViewEvent = (
+    EventHover
+    | EventCurveSelected
+    | EventCPPickStart
+    | EventCPDrag
+    | EventCPPickEnd
+    | EventPick
+    | EventShortcut
+)
 
 
 class CmdHighlightCurve(TypedDict):
@@ -217,10 +217,10 @@ class CmdSetAxisConstraint(TypedDict):
     mask: int
 
 
-ViewerCommand = Union[
-    CmdHighlightCurve,
-    CmdUpdateHud,
-    CmdSetEditMode,
-    CmdSetActiveCurve,
-    CmdSetAxisConstraint,
-]
+ViewerCommand = (
+    CmdHighlightCurve
+    | CmdUpdateHud
+    | CmdSetEditMode
+    | CmdSetActiveCurve
+    | CmdSetAxisConstraint
+)

@@ -1,19 +1,18 @@
+import os
 import queue
 import tomllib
-import os
 
-from direct.showbase.ShowBase import ShowBase
-from panda3d.core import WindowProperties
 from direct.gui.OnscreenText import OnscreenText
-from panda3d.core import TextNode
+from direct.showbase.ShowBase import ShowBase
+from panda3d.core import TextNode, WindowProperties
 
-from bot.view.scene import Scene
-from bot.viewer.serialize import payload_to_geom_data
 from bot.control.camera import CameraController
-from bot.control.mouse import MouseHandler, CursorManager
+from bot.control.mouse import CursorManager, MouseHandler
 from bot.control.shortcuts import InputContext
 from bot.control.shortcuts_registry import registry as shortcut_registry
+from bot.view.scene import Scene
 from bot.viewer.contracts import ScenePayload, SceneUpdateOp, ViewerCommandType
+from bot.viewer.serialize import payload_to_geom_data
 
 _DEFAULT_SCENE = {
     "background_color": [0.1, 0.1, 0.12],
@@ -164,8 +163,6 @@ class View(ShowBase):
                 self.hud.setText("Create mode enabled.")
             else:
                 self.hud.setText("Create mode disabled.")
-
-
 
     def __on_hot_reload(self):
         """Reload TOML config from disk and apply to scene / camera."""

@@ -1,5 +1,5 @@
-from panda3d.core import LPoint3, LVector3, OrthographicLens, LineSegs, NodePath
-from direct.interval.IntervalGlobal import Parallel, LerpFunc, Sequence, Func
+from direct.interval.IntervalGlobal import Func, LerpFunc, Parallel, Sequence
+from panda3d.core import LineSegs, LPoint3, LVector3, NodePath, OrthographicLens
 
 
 class CameraController:

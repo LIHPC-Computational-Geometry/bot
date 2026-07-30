@@ -1,5 +1,6 @@
 from panda3d.core import LineSegs, WindowProperties
 
+
 class CursorManager:
     def __init__(self, base, size: float = 0.025, thickness: float = 2.0):
         self.base = base
@@ -30,7 +31,6 @@ class CursorManager:
         self.custom_cursor.setDepthWrite(False)
         self.custom_cursor.setLightOff()
         self.custom_cursor.hide()
-
 
     def set_cursor_mode(self, use_custom: bool | None = None):
         props = WindowProperties()

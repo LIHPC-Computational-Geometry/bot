@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 from bot.control.shortcuts.binding import (
     Binding,
@@ -321,9 +322,12 @@ class ShortcutRegistry:
         self._hold_keys[key] = value
 
     def _hold_task(self, task):
-        if self._hold_entry is not None and self._ctx is not None:
-            if any(self._hold_keys.values()):
-                self._invoke(self._hold_entry, dict(self._hold_keys))
+        if (
+            self._hold_entry is not None
+            and self._ctx is not None
+            and any(self._hold_keys.values())
+        ):
+            self._invoke(self._hold_entry, dict(self._hold_keys))
         return task.cont
 
 
