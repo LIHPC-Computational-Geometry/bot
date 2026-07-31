@@ -9,5 +9,4 @@ __all__ = [
     "CompositeAdapter",
     "SplineAdapter",
     "Viewer",
-
 ]

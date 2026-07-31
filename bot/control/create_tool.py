@@ -121,10 +121,7 @@ class CreateSplineTool:
             try:
                 # Generate a smooth approximation for the preview
                 smooth_pts = SplineModel.preview_evaluate(
-                    type="bezier",
-                    degree=len(pts) - 1,
-                    control_points=pts,
-                    sample=30
+                    type="bezier", degree=len(pts) - 1, control_points=pts, sample=30
                 )
                 if len(smooth_pts) > 0:
                     lines.moveTo(*smooth_pts[0])
@@ -147,7 +144,7 @@ class CreateSplineTool:
         if len(self.points) >= 2:
             payload = {
                 "points": copy.deepcopy(self.points),
-                "degree": len(self.points) - 1
+                "degree": len(self.points) - 1,
             }
             self.on_event_cb(ViewEventType.CREATE_SPLINE, payload)
 

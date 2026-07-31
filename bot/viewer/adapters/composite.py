@@ -26,17 +26,22 @@ from .adapter_spline import SplineAdapter
 
 _logger = logging.getLogger(__name__)
 
+
 class CompositeAdapter:
     """
     Aggregator for multiple Adapter adapters (e.g., CAD and Spline).
     It routes events to the correct adapter based on tag namespaces.
     """
 
+    # Define global event types that should be broadcasted to all adapters
+
+    # =========================================================================
+    # INITIALIZATION & CONSTRUCTORS
+    # =========================================================================
+
     def __init__(self, adapters: dict[str, Adapter]) -> None:
         self._adapters = adapters
         self._update_callback: Callable[[ScenePayload], None] | None = None
-
-        # Define global event types that should be broadcasted to all adapters
         self.GLOBAL_EVENT_TYPES = {
             ViewEventType.HOVER,
             ViewEventType.SHORTCUT,
@@ -52,6 +57,10 @@ class CompositeAdapter:
         if spline_model is not None:
             adapters["spline"] = SplineAdapter(spline_model)
         return cls(adapters)
+
+    # =========================================================================
+    # PUBLIC API & CORE INTERFACES
+    # =========================================================================
 
     def bind_update(self, callback: Callable[[ScenePayload], None]) -> None:
         """Fan in update callbacks from all child adapters."""
@@ -75,6 +84,10 @@ class CompositeAdapter:
         payloads = [adapter.get_delta_load() for adapter in self._adapters.values()]
         return merge_deltas(*payloads)
 
+    # =========================================================================
+    # EVENT ROUTING
+    # =========================================================================
+
     def handle_event(self, event: ViewEvent) -> list[ViewerCommand]:
         """Route an event to the adapter matching the tag namespace."""
         tag = event.get("curve_tag") or event.get("tag")
@@ -96,8 +109,9 @@ class CompositeAdapter:
                     return adapter.handle_event(event)
             return []
 
-        # NOTE: Fallback: Route to the default CAD adapter if no namespace is provied
+        # NOTE: Fallback: Route to the default CAD adapter if no namespace is provided
         cad = self._adapters.get(CAD_NS)
         if cad is not None:
             return cad.handle_event(event)
+
         return []

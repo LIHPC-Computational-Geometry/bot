@@ -37,6 +37,7 @@ def quit_view(ctx):
     else:
         sys.exit(0)
 
+
 @bind(Key("enter"), scope="local")
 def commit_curve(ctx):
     """Commits the current spline if creation mode is active."""

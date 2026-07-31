@@ -23,7 +23,6 @@ __all__ = [
 ]
 
 
-
 class Adapter(Protocol):
     """Interface for objects that can be rendered and observed by the Viewer."""
 

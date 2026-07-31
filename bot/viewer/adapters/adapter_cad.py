@@ -27,6 +27,7 @@ from bot.viewer.tags import (
 
 _logger = logging.getLogger(__name__)
 
+
 class CADAdapter(BaseAdapter):
     """
     Adapter bridging a CADModel to the Viewer IPC layer.
@@ -40,11 +41,16 @@ class CADAdapter(BaseAdapter):
         self._model = model
         self._model.add_observer(self)
 
+        # NOTE Route table mapping event types to specific handler methods
         self._event_handlers = {
             ViewEventType.HOVER: self._on_hover_event,
             ViewEventType.CURVE_SELECTED: self._on_curve_selected_event,
             ViewEventType.PICK: self._on_pick_event,
         }
+
+    # =========================================================================
+    # PUBLIC API & CORE INTERFACES
+    # =========================================================================
 
     def get_delta_load(self) -> ScenePayload:
         """Build the initial add payload with curves, bounds, and flat topology."""
@@ -63,12 +69,26 @@ class CADAdapter(BaseAdapter):
             ]
         return payload
 
+    def update(self, _model: CADModel) -> None:
+        """Observer callback: push an update delta when the model changes."""
+        if self._update_callback is not None:
+            self._update_callback(
+                {
+                    "op": SceneUpdateOp.UPDATE,
+                    "changed_curves": self._build_changed_curves(),
+                }
+            )
+
     def handle_event(self, event: ViewEvent) -> list[ViewerCommand]:
         """Dispatch events using a dictionary of registered callbacks."""
         handler = self._event_handlers.get(event.get("event_type"))
         if handler:
             return handler(event)
         return []
+
+    # =========================================================================
+    # EVENT HANDLERS (ROUTED VIA DICTIONARY)
+    # =========================================================================
 
     def _on_hover_event(self, event: ViewEvent) -> list[ViewerCommand]:
         """Extract tag and trigger hover visualization."""
@@ -92,47 +112,9 @@ class CADAdapter(BaseAdapter):
                 _logger.warning("CAD pick add_point failed: %s", exc)
         return []
 
-    def update(self, _model: CADModel) -> None:
-        """Observer callback: push an update delta when the model changes."""
-        if self._update_callback is not None:
-            self._update_callback(
-                {
-                    "op": SceneUpdateOp.UPDATE,
-                    "changed_curves": self._build_changed_curves(),
-                }
-            )
-
-    def _resolve_cad_tag(self, event: ViewEvent) -> int | None:
-        """Extract and validate the CAD local curve id from an event."""
-        raw = event.get("curve_tag") or event.get("tag")
-        if raw is None:
-            return None
-        return self._resolve_cad_tag_str(str(raw))
-
-    def _resolve_cad_tag_str(self, tag_str: str) -> int | None:
-        """Return the CAD local id for a namespaced tag, or None if invalid."""
-        if not is_namespaced(tag_str):
-            return None
-        decoded = decode(tag_str)
-        if decoded is None or decoded[0] != CAD_NS:
-            return None
-        local_id = parse_cad_local_id(tag_str)
-        if local_id is None or not self._model.has_curve(local_id):
-            return None
-        return local_id
-
-    def _get_hover_info(self, tag_str: str) -> str:
-        """Return CAD curve endpoint details for HUD display."""
-        local_id = self._resolve_cad_tag_str(tag_str)
-        if local_id is None:
-            return "Type: unknown"
-        try:
-            coords_a, coords_b = self._model.get_end_points_coords(local_id)
-            pt_a = f"({coords_a[0]:.2f}, {coords_a[1]:.2f}, {coords_a[2]:.2f})"
-            pt_b = f"({coords_b[0]:.2f}, {coords_b[1]:.2f}, {coords_b[2]:.2f})"
-            return f"Type: linear segment\nEndpoint A: {pt_a}\nEndpoint B: {pt_b}"
-        except Exception() as exc:
-            return f"Error: {exc}"
+    # =========================================================================
+    # GEOMETRY & RENDERING BUILDERS
+    # =========================================================================
 
     def _build_changed_curves(self) -> dict[str, CurveDelta]:
         """Discretize all CAD curves into namespaced render deltas."""
@@ -168,3 +150,39 @@ class CADAdapter(BaseAdapter):
             for idx_a, idx_b in edges:
                 flat_edges.append((offset + idx_a, offset + idx_b, str(tag)))
         return flat_points, flat_edges
+
+    # =========================================================================
+    # UTILITIES & HELPERS
+    # =========================================================================
+
+    def _resolve_cad_tag(self, event: ViewEvent) -> int | None:
+        """Extract and validate the CAD local curve id from an event."""
+        raw = event.get("curve_tag") or event.get("tag")
+        if raw is None:
+            return None
+        return self._resolve_cad_tag_str(str(raw))
+
+    def _resolve_cad_tag_str(self, tag_str: str) -> int | None:
+        """Return the CAD local id for a namespaced tag, or None if invalid."""
+        if not is_namespaced(tag_str):
+            return None
+        decoded = decode(tag_str)
+        if decoded is None or decoded[0] != CAD_NS:
+            return None
+        local_id = parse_cad_local_id(tag_str)
+        if local_id is None or not self._model.has_curve(local_id):
+            return None
+        return local_id
+
+    def _get_hover_info(self, tag_str: str) -> str:
+        """Return CAD curve endpoint details for HUD display."""
+        local_id = self._resolve_cad_tag_str(tag_str)
+        if local_id is None:
+            return "Type: unknown"
+        try:
+            coords_a, coords_b = self._model.get_end_points_coords(local_id)
+            pt_a = f"({coords_a[0]:.2f}, {coords_a[1]:.2f}, {coords_a[2]:.2f})"
+            pt_b = f"({coords_b[0]:.2f}, {coords_b[1]:.2f}, {coords_b[2]:.2f})"
+            return f"Type: linear segment\nEndpoint A: {pt_a}\nEndpoint B: {pt_b}"
+        except Exception() as exc:
+            return f"Error: {exc}"

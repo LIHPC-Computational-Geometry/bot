@@ -180,11 +180,14 @@ class EventShortcut(TypedDict):
     event_type: Literal[ViewEventType.SHORTCUT]
     action: str
 
+
 class EventCreateSpline(TypedDict):
     """Payload for creating a new spline from the View."""
+
     event_type: Literal[ViewEventType.CREATE_SPLINE]
     points: list[list[float]]
     degree: int
+
 
 ViewEvent = (
     EventHover
