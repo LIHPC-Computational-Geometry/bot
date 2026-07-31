@@ -1,4 +1,5 @@
-from typing import Optional, Dict, Any, Tuple
+from typing import Any
+
 from panda3d.core import (
     BitMask32,
     CollisionHandlerQueue,
@@ -32,7 +33,7 @@ class RayPicker:
         self.picker_node.addSolid(self.picker_ray)
         self.traverser.addCollider(self.picker_np, self.queue)
 
-    def pick_entry(self, m_pos: Point2, expected_kind: str) -> Optional[Any]:
+    def pick_entry(self, m_pos: Point2, expected_kind: str) -> Any | None:
         """
         Casts a ray from the mouse position and returns the entry corresponding to the expected kind.
         """
@@ -53,7 +54,7 @@ class RayPicker:
 
         return None
 
-    def get_metadata(self, entry: Any) -> Dict[str, Any]:
+    def get_metadata(self, entry: Any) -> dict[str, Any]:
         """Extracts metadata (tag, index, position) from a collision entry."""
         np = entry.getIntoNodePath()
         pick_kind = np.getNetTag("pick_kind") if np.hasNetTag("pick_kind") else None
@@ -75,7 +76,7 @@ class RayPicker:
 
     def _get_priority_distance_depth(
         self, entry: Any, m_pos: Point2
-    ) -> Tuple[int, float, float]:
+    ) -> tuple[int, float, float]:
         """Calculates the priority score for sorting collisions (favors CPs)."""
         np = entry.getIntoNodePath()
         pick_kind = np.getNetTag("pick_kind") if np.hasNetTag("pick_kind") else ""
@@ -86,7 +87,10 @@ class RayPicker:
             if hasattr(solid, "getCenter"):
                 cp_world = self.base.render.getRelativePoint(np, solid.getCenter())
                 p2d = Point2()
-                if self.base.camLens.project(cp_world, p2d):
+
+                # FIX: Utiliser la véritable lentille courante
+                current_lens = self.base.cam.node().getLens()
+                if current_lens.project(cp_world, p2d):
                     dist_sq = (p2d.getX() - m_pos.getX()) ** 2 + (
                         p2d.getY() - m_pos.getY()
                     ) ** 2

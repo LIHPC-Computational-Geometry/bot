@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import struct
-from typing import Any, Iterable, Sequence
+from collections.abc import Iterable, Sequence
+from typing import Any
 
 import numpy as np
 
@@ -181,7 +182,7 @@ def payload_to_geom_data(payload: ScenePayload) -> ScenePayload:
     flat_points: list[list[float]] = []
     flat_edges: list[tuple[int, int, int]] = []
 
-    if "points" in payload and payload["points"]:
+    if payload.get("points"):
         point_count = vertex_count_from_bytes(payload["points"])
         flat_points = bytes_to_point_list(payload["points"], point_count)
 

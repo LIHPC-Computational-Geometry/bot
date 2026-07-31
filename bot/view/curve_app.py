@@ -185,7 +185,7 @@ class CurveApp:
         lines = LineSegs()
         lines.setThickness(float(self.line_thickness))
         if self.tag.split(":")[0] == "spline":
-            lines.setColor(0, 0.8, 1, 1)
+            lines.setColor(0, 0.5, 1, 1)
         else:
             lines.setColor(1, 1, 1, 1)
 

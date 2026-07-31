@@ -160,9 +160,11 @@ class View(ShowBase):
         self.cursor.set_cursor_mode()
         if self._scene:
             if self.cursor.is_custom:
-                self.hud.setText("Create mode enabled.")
+                self.hud.setText("Create mode enabled. Right click to add points. Enter to finish.")
+                self.mouse_handler.set_creation_mode(True)
             else:
                 self.hud.setText("Create mode disabled.")
+                self.mouse_handler.set_creation_mode(False)
 
     def __on_hot_reload(self):
         """Reload TOML config from disk and apply to scene / camera."""

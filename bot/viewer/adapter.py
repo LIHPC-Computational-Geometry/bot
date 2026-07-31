@@ -67,7 +67,7 @@ class BaseAdapter:
     def __init__(self) -> None:
         self._update_callback: Callable[[ScenePayload], None] | None = None
         self._last_hovered: str | None = None
-        self.color: list[float] = [1.0, 0.0, 1.0, 1.0]
+        self.color: list[float] = [1.0, 1.0, 1.0, 1.0]
         self.hover_color: list[float] = [1.0, 0.5, 0.0, 1.0]
 
     def bind_update(self, callback: Callable[[ScenePayload], None]) -> None:
@@ -285,7 +285,7 @@ class SplineAdapter(BaseAdapter):
 
     def __init__(self, model: SplineModel) -> None:
         super().__init__()
-        self.color = [0.0, 1.0, 1.0, 1.0]
+        self.color = [0.0, 0.5, 1.0, 1.0]
         self._model = model
         self._model.add_observer(self)
 
@@ -304,6 +304,15 @@ class SplineAdapter(BaseAdapter):
         if event_type == ViewEventType.HOVER:
             tag_str = str(tag) if tag is not None else None
             return self._handle_hover(tag_str)
+
+        if event_type == ViewEventType.SHORTCUT and event.get("action") == "create_interpolated_spline":
+            points = event.get("points")
+            if points and len(points) >= 2:
+                try:
+                    self._model.add_interpolated_curve(points, len(points) - 1)
+                except Exception() as exc:
+                    _logger.warning("SplineAdapter failed to create interpolated curve: %s", exc)
+            return []
 
         local_id = self._resolve_spline_tag(event)
         if local_id is None:
@@ -455,7 +464,7 @@ class CompositeAdapter:
         tag = event.get("curve_tag") or event.get("tag")
         event_type = event.get("event_type", "")
 
-        if tag is None and event_type == ViewEventType.HOVER:
+        if tag is None and event_type in (ViewEventType.HOVER, ViewEventType.SHORTCUT):
             commands = []
             for adapter in self._adapters.values():
                 commands.extend(adapter.handle_event(event))

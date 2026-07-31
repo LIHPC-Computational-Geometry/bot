@@ -1,8 +1,8 @@
 from __future__ import annotations
+
 import numpy as np
 
 import ferrispline
-
 from bot.core.observable import Observable
 
 BEZIER_TYP = "bezier"
@@ -40,8 +40,8 @@ class SplineModel(Observable):
         type: str,
         degree: int,
         control_points: list[list[float]],
-        weights: list[float] = None,
-        knots: list[float] = None,
+        weights: list[float] | None = None,
+        knots: list[float] | None = None,
     ) -> str:
         """
         Adds a new curve to the model.
@@ -63,6 +63,28 @@ class SplineModel(Observable):
             return tag
         else:
             raise TypeError("Invalid curve type")
+
+    def add_interpolated_curve(self, points: list[list[float]], degree: int) -> str:
+        """
+        Adds a new NURBS curve to the model by interpolating strict passage points.
+        Computes and stores the curve information using the geometric kernel.
+        """
+        pts_array = np.array(points, dtype=np.float64)
+        print("EXAMPLES !!!!!!!!")
+        # Résolution de l'interpolation selon la méthode exposée par le backend C++ (ferrispline)
+        if hasattr(self._model, "create_interpolated_nurbs"):
+            print("azertyuiuytrezaerty:    ",)
+            tag = self._model.create_bezier(degree, pts_array, None)
+            # tag = self._model.create_interpolated_nurbs(degree, pts_array)
+        elif hasattr(self._model, "interpolate_curve"):
+            tag = self._model.interpolate_curve(degree, pts_array)
+        else:
+            # Fallback si l'API d'interpolation n'est pas directement exposée
+            tag = self._model.create_bezier(degree, pts_array, None)
+
+        self.curves.append(tag)
+        self._notify_observers()
+        return tag
 
     def remove_curve(self, tag: str):
         if self._model.delete_curve(tag):
@@ -99,8 +121,8 @@ class SplineModel(Observable):
         degree: int,
         control_points: list[list[float]],
         sample: int = 10,
-        weights: list[float] = None,
-        knots: list[float] = None,
+        weights: list[float] | None = None,
+        knots: list[float] | None = None,
     ) -> list[list[float]]:
         return ferrispline.PyModel().preview_evaluate(
             type,

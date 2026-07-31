@@ -12,7 +12,7 @@ from panda3d.core import (
 
 from bot.view.curve_app import CurveApp
 from bot.viewer.contracts import ScenePayload
-from bot.viewer.serialize import payload_to_geom_data
+from bot.viewer.serialize import curve_delta_to_curve_info, payload_to_geom_data
 
 _DEFAULT_BOUNDS = {
     "min": [0, 0, 0],
@@ -273,8 +273,19 @@ class Scene:
         """Apply incremental curve geometry updates from the parent process."""
         for tag, delta in payload.get("changed_curves", {}).items():
             curve = self._get_curve(tag)
+
             if curve is None:
+                curve_info = curve_delta_to_curve_info(str(tag), delta)
+                new_curve = CurveApp(str(tag), curve_info)
+                new_curve.update_collision_sizes(self.last_units_per_pixel)
+                new_curve.line_thickness = self.line_thickness
+                self.curves[str(tag)] = new_curve
+
+                if self.geom_node is not None:
+                    root_node = self.geom_node.attachNewNode(f"curve_{tag}")
+                    new_curve.attach_curve_node(root_node)
                 continue
+
             geometry = delta["geometry"]
             curve.apply_geometry_bytes(
                 geometry["curve_vertices"], delta["vertex_count"]

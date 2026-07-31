@@ -1,6 +1,7 @@
 from direct.showbase.InputStateGlobal import inputState
 from panda3d.core import MouseButton, Point2, Point3
 
+from bot.control.create_tool import CreateSplineTool
 from bot.control.cursor_manager import CursorManager
 from bot.control.picker import RayPicker
 from bot.math.constraints import ConstraintManager
@@ -24,34 +25,38 @@ class MouseHandler:
     def __init__(self, base, gesture_tracker=None):
         """
         Register the per-frame update task.
-
         Args:
             base: Panda3D ShowBase instance.
             gesture_tracker: Optional ``GestureTracker`` from the shortcut registry.
         """
         self.base = base
         self.gesture_tracker = gesture_tracker
+        self.creation_mode_enabled = False
         self.prev_mouse_pos = None
         self._left_was_down = False
-
         self.picker = RayPicker(self.base)
         self.constraints = ConstraintManager(self.base)
         self.cursor_manager = CursorManager(self.base)
-
         self.last_hovered_tag = None
         self.edit_mode_enabled = False
         self.active_curve_tag = None
-
         self.dragging_cp = False
         self.drag_curve_tag = None
         self.drag_cp_index = None
         self.drag_last_valid_world_pos = None
         self.drag_offset = [0.0, 0.0, 0.0]
 
+        self._right_was_down = False
+        self.create_tool = CreateSplineTool(self.base, self.constraints, self.base._on_event_cb)
+
         self.base.taskMgr.add(self.update, "MouseTask")
 
     def set_gesture_tracker(self, gesture_tracker) -> None:
         self.gesture_tracker = gesture_tracker
+
+    def set_creation_mode(self, enabled: bool):
+        self.creation_mode_enabled = enabled
+        self.create_tool.set_enabled(enabled)
 
     def set_edit_mode(self, enabled: bool, curve_tag=None):
         self.edit_mode_enabled = bool(enabled)
@@ -256,6 +261,7 @@ class MouseHandler:
             if self.dragging_cp:
                 self._finalize_drag(self.drag_last_valid_world_pos)
             self._left_was_down = False
+            self._right_was_down = False
             self.prev_mouse_pos = None
             if self.gesture_tracker is not None:
                 self.gesture_tracker.reset()
@@ -264,6 +270,12 @@ class MouseHandler:
         m_pos = self.base.mouseWatcherNode.getMouse()
         curr_pos = Point2(m_pos.getX(), m_pos.getY())
         left_down = self.base.mouseWatcherNode.isButtonDown(MouseButton.one())
+        right_down = self.base.mouseWatcherNode.isButtonDown(MouseButton.three())
+
+        # Forward mouse events to the creation tool
+        self.create_tool.on_mouse_move(m_pos)
+        if right_down and not self._right_was_down:
+            self.create_tool.on_mouse_click(m_pos, "right")
 
         self._handle_hover(m_pos)
         self._handle_curve_click(m_pos, left_down)
@@ -271,4 +283,6 @@ class MouseHandler:
         self._handle_gestures(curr_pos, left_down)
 
         self._left_was_down = left_down
+        self._right_was_down = right_down
+
         return task.cont
