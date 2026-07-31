@@ -157,6 +157,12 @@ class CADAdapter(BaseAdapter):
         self._model = model
         self._model.add_observer(self)
 
+        self._event_handlers = {
+            ViewEventType.HOVER: self._on_hover_event,
+            ViewEventType.CURVE_SELECTED: self._on_curve_selected_event,
+            ViewEventType.PICK: self._on_pick_event,
+        }
+
     def get_delta_load(self) -> ScenePayload:
         """Build the initial add payload with curves, bounds, and flat topology."""
         changed_curves = self._build_changed_curves()
@@ -175,26 +181,33 @@ class CADAdapter(BaseAdapter):
         return payload
 
     def handle_event(self, event: ViewEvent) -> list[ViewerCommand]:
-        """Dispatch hover, selection, pick, and control-point events."""
-        event_type = event.get("event_type", "")
+        """Dispatch events using a dictionary of registered callbacks."""
+        handler = self._event_handlers.get(event.get("event_type"))
+        if handler:
+            return handler(event)
+        return []
+
+    def _on_hover_event(self, event: ViewEvent) -> list[ViewerCommand]:
+        """Extract tag and trigger hover visualization."""
         tag = event.get("tag") or event.get("curve_tag")
-        match event_type:
-            case ViewEventType.HOVER:
-                return self._handle_hover(tag)
-            case ViewEventType.CURVE_SELECTED:
-                if tag is None or self._resolve_cad_tag_str(str(tag)) is None:
-                    return []
-                return self._handle_curve_selected(str(tag))
-            case ViewEventType.PICK:
-                world_pos = event.get("world_pos")
-                if world_pos is not None:
-                    try:
-                        self._model.add_point(list(world_pos))
-                    except Exception() as exc:
-                        _logger.warning("CAD pick add_point failed: %s", exc)
-                return []
-            case _:
-                return []
+        return self._handle_hover(tag)
+
+    def _on_curve_selected_event(self, event: ViewEvent) -> list[ViewerCommand]:
+        """Activate edit mode for the selected CAD curve."""
+        tag = event.get("tag") or event.get("curve_tag")
+        if tag is None or self._resolve_cad_tag_str(str(tag)) is None:
+            return []
+        return self._handle_curve_selected(str(tag))
+
+    def _on_pick_event(self, event: ViewEvent) -> list[ViewerCommand]:
+        """Handle 3D point picking to add a new free point to the CAD model."""
+        world_pos = event.get("world_pos")
+        if world_pos is not None:
+            try:
+                self._model.add_point(list(world_pos))
+            except Exception() as exc:
+                _logger.warning("CAD pick add_point failed: %s", exc)
+        return []
 
     def update(self, _model: CADModel) -> None:
         """Observer callback: push an update delta when the model changes."""
@@ -289,6 +302,13 @@ class SplineAdapter(BaseAdapter):
         self._model = model
         self._model.add_observer(self)
 
+        self._event_handlers = {
+            ViewEventType.HOVER: self._on_hover_event,
+            ViewEventType.CURVE_SELECTED: self._on_curve_selected_event,
+            ViewEventType.CP_PICK_END: self._on_cp_pick_end_event,
+            ViewEventType.CREATE_SPLINE: self._on_shortcut_event,
+        }
+
     def get_delta_load(self) -> ScenePayload:
         """Build the initial add payload with all spline curves."""
         return {
@@ -297,37 +317,42 @@ class SplineAdapter(BaseAdapter):
         }
 
     def handle_event(self, event: ViewEvent) -> list[ViewerCommand]:
-        """Dispatch selection and control-point drag events for spline curves."""
-        event_type = event.get("event_type", "")
+        """Dispatch events using a dictionary of registered callbacks."""
+        handler = self._event_handlers.get(event.get("event_type"))
+        if handler:
+            return handler(event)
+        return []
+
+    def _on_hover_event(self, event: ViewEvent) -> list[ViewerCommand]:
+        """Extract tag and trigger hover visualization."""
         tag = event.get("tag") or event.get("curve_tag")
+        return self._handle_hover(str(tag) if tag is not None else None)
 
-        if event_type == ViewEventType.HOVER:
-            tag_str = str(tag) if tag is not None else None
-            return self._handle_hover(tag_str)
+    def _on_shortcut_event(self, event: ViewEvent) -> list[ViewerCommand]:
+        """Process domain-specific shortcuts like creating a new interpolated spline."""
+        points = event.get("points")
+        if points and len(points) >= 2:
+            try:
+                self._model.add_interpolated_curve(points, len(points) - 1)
+            except Exception() as exc:
+                _logger.warning(
+                    "SplineAdapter failed to create interpolated curve: %s", exc
+                )
+        return []
 
-        if event_type == ViewEventType.CREATE_SPLINE:
-            points = event.get("points")
-            if points and len(points) >= 2:
-                try:
-                    self._model.add_interpolated_curve(points, len(points) - 1)
-                except Exception() as exc:
-                    _logger.warning(
-                        "SplineAdapter failed to create interpolated curve: %s", exc
-                    )
-            return []
-
+    def _on_curve_selected_event(self, event: ViewEvent) -> list[ViewerCommand]:
+        """Activate edit mode for the selected spline."""
         local_id = self._resolve_spline_tag(event)
-        if local_id is None:
-            return []
+        if local_id is not None:
+            return self._handle_curve_selected(encode(SPLINE_NS, local_id))
+        return []
 
-        ns_tag = encode(SPLINE_NS, local_id)
-        match event_type:
-            case ViewEventType.CURVE_SELECTED:
-                return self._handle_curve_selected(ns_tag)
-            case ViewEventType.CP_PICK_END:
-                return self._handle_cp_pick_end(event, local_id)
-            case _:
-                return []
+    def _on_cp_pick_end_event(self, event: ViewEvent) -> list[ViewerCommand]:
+        """Apply the new control point position to the model."""
+        local_id = self._resolve_spline_tag(event)
+        if local_id is not None:
+            return self._handle_cp_pick_end(event, local_id)
+        return []
 
     def update(self, _model: SplineModel) -> None:
         """Observer callback: push an update delta when the model changes."""
@@ -429,6 +454,13 @@ class CompositeAdapter:
         self._adapters = adapters
         self._update_callback: Callable[[ScenePayload], None] | None = None
 
+        # Define global event types that should be broadcasted to all adapters
+        self.GLOBAL_EVENT_TYPES = {
+            ViewEventType.HOVER,
+            ViewEventType.SHORTCUT,
+            ViewEventType.CREATE_SPLINE,
+        }
+
     @classmethod
     def from_models(
         cls, cad_model: CADModel, spline_model: SplineModel | None = None
@@ -466,12 +498,14 @@ class CompositeAdapter:
         tag = event.get("curve_tag") or event.get("tag")
         event_type = event.get("event_type", "")
 
-        if tag is None and event_type in (ViewEventType.HOVER, ViewEventType.SHORTCUT, ViewEventType.CREATE_SPLINE):
+        # NOTE: Broadcast global events to all registered adapters
+        if tag is None and event_type in self.GLOBAL_EVENT_TYPES:
             commands = []
             for adapter in self._adapters.values():
                 commands.extend(adapter.handle_event(event))
             return commands
 
+        # NOTE: Route namespaced events to their specific adapter (e.g., 'spline:123')
         if tag is not None and is_namespaced(str(tag)):
             ns = prefix(str(tag))
             if ns is not None:
@@ -480,6 +514,7 @@ class CompositeAdapter:
                     return adapter.handle_event(event)
             return []
 
+        # NOTE: Fallback: Route to the default CAD adapter if no namespace is provied
         cad = self._adapters.get(CAD_NS)
         if cad is not None:
             return cad.handle_event(event)
