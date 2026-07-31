@@ -102,7 +102,6 @@ class CurveApp:
         color_writer = GeomVertexWriter(vdata, "color")
         prim = GeomPoints(Geom.UHDynamic)
 
-        # vertex_index = 0
         num_points = len(self.points)
 
         for vertex_index, i in enumerate(
@@ -128,7 +127,6 @@ class CurveApp:
             vertex_writer.addData3f(*pt)
             color_writer.addData4f(*self.knots_color[i - self.degree])
             prim.addVertex(vertex_index)
-            # vertex_index += 1
 
         prim.closePrimitive()
         geom = Geom(vdata)
@@ -187,9 +185,9 @@ class CurveApp:
         lines = LineSegs()
         lines.setThickness(float(self.line_thickness))
         if self.tag.split(":")[0] == "spline":
-            lines.setColor(0, 1, 1, 1)
+            lines.setColor(0, 0.8, 1, 1)
         else:
-            lines.setColor(1, 0, 1, 1)
+            lines.setColor(1, 1, 1, 1)
 
         for idxA, idxB in self.edges:
             lines.moveTo(*self.points[idxA])
