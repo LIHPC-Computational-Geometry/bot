@@ -7,7 +7,9 @@ from typing import Any
 
 from bot.core.cad import CADModel
 from bot.core.spline import SplineModel
-from bot.viewer.adapter import Adapter, CADAdapter, CompositeAdapter
+from bot.viewer.adapters import Adapter
+from bot.viewer.adapters.adapter_cad import CADAdapter
+from bot.viewer.adapters.composite import CompositeAdapter
 from bot.viewer.contracts import (
     ParentCommand,
     ScenePayload,
