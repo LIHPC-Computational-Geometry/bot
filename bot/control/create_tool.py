@@ -30,7 +30,7 @@ class CreateSplineTool:
             self._discard_curve()
 
     def _get_initial_focus(self):
-        """Récupère le point focal de la caméra pour éviter de placer la courbe trop loin dans la profondeur."""
+        """Retrieves the camera's focal point to avoid placing the curve too far into the depth."""
         if hasattr(self.base, '_camera_controller') and self.base._camera_controller:
             return list(self.base._camera_controller.model_center)
         return [0.0, 0.0, 0.0]
@@ -40,23 +40,18 @@ class CreateSplineTool:
         if not self.is_active or button != "right":
             return
 
-        # Initialize the projection plane on the first click
         if self.state == "WAITING_FIRST_POINT":
             start_pos = self._get_initial_focus()
             self.constraints.drag_start_world_pos = start_pos
             self.constraints.drag_plane = self.constraints.build_drag_plane(Point3(*start_pos))
-            # FIX: Le premier point est posé librement sous la souris (plan caméra).
-            # On ignore la contrainte 1D/2D globale pour éviter un "jump" brutal vers le centre du modèle.
             self.constraints.drag_active_mask = 7
         else:
-            # Pour les points suivants, on applique la contrainte globale par rapport au point précédent
             self.constraints.drag_active_mask = self.constraints.axis_constraint_mask
 
         world_pos = self.constraints.mouse_to_constrained_axis(m_pos)
         if world_pos:
             self.points.append(world_pos)
             self.state = "DRAWING"
-            # Le point qui vient d'être posé devient la nouvelle ancre pour la contrainte du point suivant
             self.constraints.drag_start_world_pos = world_pos
             self.constraints.drag_plane = self.constraints.build_drag_plane(Point3(*world_pos))
             self._draw_preview()
@@ -68,7 +63,6 @@ class CreateSplineTool:
 
         self.constraints.drag_active_mask = self.constraints.axis_constraint_mask
 
-        # Met à jour dynamiquement le plan face à la caméra en mode libre (mask=7)
         if self.constraints.drag_active_mask == 7 and self.constraints.drag_start_world_pos:
             self.constraints.drag_plane = self.constraints.build_drag_plane(Point3(*self.constraints.drag_start_world_pos))
 
@@ -90,7 +84,6 @@ class CreateSplineTool:
 
     def _draw_preview(self, points_to_draw=None):
         """Renders a temporary polyline connecting the current points."""
-        # Suppression stricte de l'ancien noeud via removeNode pour éviter le lag visuel et la fuite mémoire
         if self._current_preview_np is not None:
             self._current_preview_np.removeNode()
             self._current_preview_np = None

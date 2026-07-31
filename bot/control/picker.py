@@ -88,7 +88,6 @@ class RayPicker:
                 cp_world = self.base.render.getRelativePoint(np, solid.getCenter())
                 p2d = Point2()
 
-                # FIX: Utiliser la véritable lentille courante
                 current_lens = self.base.cam.node().getLens()
                 if current_lens.project(cp_world, p2d):
                     dist_sq = (p2d.getX() - m_pos.getX()) ** 2 + (

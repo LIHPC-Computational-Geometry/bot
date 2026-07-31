@@ -70,17 +70,7 @@ class SplineModel(Observable):
         Computes and stores the curve information using the geometric kernel.
         """
         pts_array = np.array(points, dtype=np.float64)
-        print("EXAMPLES !!!!!!!!")
-        # Résolution de l'interpolation selon la méthode exposée par le backend C++ (ferrispline)
-        if hasattr(self._model, "create_interpolated_nurbs"):
-            print("azertyuiuytrezaerty:    ",)
-            tag = self._model.create_bezier(degree, pts_array, None)
-            # tag = self._model.create_interpolated_nurbs(degree, pts_array)
-        elif hasattr(self._model, "interpolate_curve"):
-            tag = self._model.interpolate_curve(degree, pts_array)
-        else:
-            # Fallback si l'API d'interpolation n'est pas directement exposée
-            tag = self._model.create_bezier(degree, pts_array, None)
+        tag = self._model.create_bezier(degree, pts_array, None)
 
         self.curves.append(tag)
         self._notify_observers()
