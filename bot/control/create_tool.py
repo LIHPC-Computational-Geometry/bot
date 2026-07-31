@@ -81,18 +81,26 @@ class CreateSplineTool:
             preview_points = self.points + [world_pos]
             self._draw_preview(preview_points)
 
-    def handle_key_press(self, key: str):
+    def handle_key_press(self, key: str) -> bool:
         """Handles keyboard shortcuts specific to the drawing context."""
         if not self.is_active:
-            return
+            return False
+
         if key == "escape":
-            self._discard_curve(keep_active=True)
-            if hasattr(self.base, "hud"):
-                self.base.hud.setText(
-                    "Curve discarded. Right click to start a new one."
-                )
+            if self.state == "DRAWING":
+                self._discard_curve(keep_active=True)
+                if hasattr(self.base, "hud"):
+                    self.base.hud.setText(
+                        "Curve discarded. Right click to start a new one."
+                    )
+                return False
+            else:
+                self.set_enabled(False)
+                return True
         elif key == "enter":
             self._commit_curve()
+            return False
+        return False
 
     def _draw_preview(self, points_to_draw=None):
         """Renders a temporary polyline connecting the current points."""

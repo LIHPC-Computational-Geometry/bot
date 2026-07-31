@@ -33,7 +33,8 @@ def quit_view(ctx):
         and ctx.mouse_handler
         and ctx.mouse_handler.creation_mode_enabled
     ):
-        ctx.mouse_handler.create_tool.handle_key_press("escape")
+        if ctx.mouse_handler.create_tool.handle_key_press("escape"):
+            ctx.messenger.send("cmd_create_mode")
     else:
         sys.exit(0)
 
