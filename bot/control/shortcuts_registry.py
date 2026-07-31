@@ -33,11 +33,9 @@ def quit_view(ctx):
         and ctx.mouse_handler
         and ctx.mouse_handler.creation_mode_enabled
     ):
-        if ctx.mouse_handler.create_tool.handle_key_press("escape"):
-            ctx.messenger.send("cmd_create_mode")
+        ctx.messenger.send("cmd_cancel_create")
     else:
         sys.exit(0)
-
 
 @bind(Key("enter"), scope="local")
 def commit_curve(ctx):
@@ -47,7 +45,7 @@ def commit_curve(ctx):
         and ctx.mouse_handler
         and ctx.mouse_handler.creation_mode_enabled
     ):
-        ctx.mouse_handler.create_tool.handle_key_press("enter")
+        ctx.messenger.send("cmd_commit_create")
 
 
 @bind(Key("f5"), scope="local")

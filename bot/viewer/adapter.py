@@ -305,10 +305,7 @@ class SplineAdapter(BaseAdapter):
             tag_str = str(tag) if tag is not None else None
             return self._handle_hover(tag_str)
 
-        if (
-            event_type == ViewEventType.SHORTCUT
-            and event.get("action") == "create_interpolated_spline"
-        ):
+        if event_type == ViewEventType.CREATE_SPLINE:
             points = event.get("points")
             if points and len(points) >= 2:
                 try:
@@ -469,7 +466,7 @@ class CompositeAdapter:
         tag = event.get("curve_tag") or event.get("tag")
         event_type = event.get("event_type", "")
 
-        if tag is None and event_type in (ViewEventType.HOVER, ViewEventType.SHORTCUT):
+        if tag is None and event_type in (ViewEventType.HOVER, ViewEventType.SHORTCUT, ViewEventType.CREATE_SPLINE):
             commands = []
             for adapter in self._adapters.values():
                 commands.extend(adapter.handle_event(event))

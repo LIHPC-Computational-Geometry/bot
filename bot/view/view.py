@@ -64,6 +64,8 @@ class View(ShowBase):
         self.accept("cmd_axis_constraint", self.__on_axis_constraint_cmd)
         self.accept("cmd_hot_reload", self.__on_hot_reload)
         self.accept("cmd_create_mode", self._create_mode)
+        self.accept("cmd_commit_create", self._commit_create_mode)
+        self.accept("cmd_cancel_create", self._cancel_create_mode)
 
         shortcut_registry.install(
             InputContext(
@@ -167,6 +169,18 @@ class View(ShowBase):
             else:
                 self.hud.setText("Create mode disabled.")
                 self.mouse_handler.set_creation_mode(False)
+
+    def _commit_create_mode(self):
+        """Triggers the creation commitment from the tool via shortcut injection."""
+        if hasattr(self, "mouse_handler") and self.mouse_handler.creation_mode_enabled:
+            self.mouse_handler.create_tool.handle_key_press("enter")
+
+    def _cancel_create_mode(self):
+        """Cancels the current spline creation via shortcut injection."""
+        if hasattr(self, "mouse_handler") and self.mouse_handler.creation_mode_enabled:
+            is_exit = self.mouse_handler.create_tool.handle_key_press("escape")
+            if is_exit:
+                self.messenger.send("cmd_create_mode")
 
     def __on_hot_reload(self):
         """Reload TOML config from disk and apply to scene / camera."""

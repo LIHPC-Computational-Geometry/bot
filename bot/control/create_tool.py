@@ -2,6 +2,7 @@ import copy
 
 from panda3d.core import LineSegs, Point2, Point3
 
+from bot.core.spline import SplineModel
 from bot.viewer.contracts import ViewEventType
 
 
@@ -103,7 +104,7 @@ class CreateSplineTool:
         return False
 
     def _draw_preview(self, points_to_draw=None):
-        """Renders a temporary polyline connecting the current points."""
+        """Renders a temporary spline or polyline connecting the current points."""
         if self._current_preview_np is not None:
             self._current_preview_np.removeNode()
             self._current_preview_np = None
@@ -115,9 +116,29 @@ class CreateSplineTool:
         lines = LineSegs()
         lines.setThickness(2.0)
         lines.setColor(0, 0.5, 1, 1)
-        lines.moveTo(*pts[0])
-        for p in pts[1:]:
-            lines.drawTo(*p)
+
+        if len(pts) > 2:
+            try:
+                # Generate a smooth approximation for the preview
+                smooth_pts = SplineModel.preview_evaluate(
+                    type="bezier",
+                    degree=len(pts) - 1,
+                    control_points=pts,
+                    sample=30
+                )
+                if len(smooth_pts) > 0:
+                    lines.moveTo(*smooth_pts[0])
+                    for p in smooth_pts[1:]:
+                        lines.drawTo(*p)
+            except Exception():
+                # Fallback to linear segments
+                lines.moveTo(*pts[0])
+                for p in pts[1:]:
+                    lines.drawTo(*p)
+        else:
+            lines.moveTo(*pts[0])
+            for p in pts[1:]:
+                lines.drawTo(*p)
 
         self._current_preview_np = self.preview_node.attachNewNode(lines.create())
 
@@ -125,10 +146,11 @@ class CreateSplineTool:
         """Validates the curve, sends it to the kernel via IPC, and readies the machine for the next curve."""
         if len(self.points) >= 2:
             payload = {
-                "action": "create_interpolated_spline",
                 "points": copy.deepcopy(self.points),
+                "degree": len(self.points) - 1
             }
-            self.on_event_cb(ViewEventType.SHORTCUT, payload)
+            self.on_event_cb(ViewEventType.CREATE_SPLINE, payload)
+
             if hasattr(self.base, "hud"):
                 self.base.hud.setText(
                     f"Curve created with {len(self.points)} points. Ready for next."

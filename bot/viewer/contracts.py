@@ -74,6 +74,8 @@ class ViewEventType(IntEnum):
     # Legitimate: Domain shortcut fired in the child; payload is ``{"action": str, ...}``.
     SHORTCUT = 106
 
+    CREATE_SPLINE = 107
+
 
 ParentCommand = SceneUpdateOp | ViewerCommandType
 ParentMessage = tuple[ParentCommand, Any]
@@ -178,6 +180,11 @@ class EventShortcut(TypedDict):
     event_type: Literal[ViewEventType.SHORTCUT]
     action: str
 
+class EventCreateSpline(TypedDict):
+    """Payload for creating a new spline from the View."""
+    event_type: Literal[ViewEventType.CREATE_SPLINE]
+    points: list[list[float]]
+    degree: int
 
 ViewEvent = (
     EventHover
@@ -187,6 +194,7 @@ ViewEvent = (
     | EventCPPickEnd
     | EventPick
     | EventShortcut
+    | EventCreateSpline
 )
 
 
