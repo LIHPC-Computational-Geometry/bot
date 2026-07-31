@@ -305,13 +305,18 @@ class SplineAdapter(BaseAdapter):
             tag_str = str(tag) if tag is not None else None
             return self._handle_hover(tag_str)
 
-        if event_type == ViewEventType.SHORTCUT and event.get("action") == "create_interpolated_spline":
+        if (
+            event_type == ViewEventType.SHORTCUT
+            and event.get("action") == "create_interpolated_spline"
+        ):
             points = event.get("points")
             if points and len(points) >= 2:
                 try:
                     self._model.add_interpolated_curve(points, len(points) - 1)
                 except Exception() as exc:
-                    _logger.warning("SplineAdapter failed to create interpolated curve: %s", exc)
+                    _logger.warning(
+                        "SplineAdapter failed to create interpolated curve: %s", exc
+                    )
             return []
 
         local_id = self._resolve_spline_tag(event)

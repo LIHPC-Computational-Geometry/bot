@@ -10,6 +10,7 @@ class CreateSplineTool:
     Tool for managing the B-Spline creation state machine and interaction flow.
     It handles 3D point projection, rubber-band preview generation, and event firing.
     """
+
     def __init__(self, base, constraints, on_event_cb):
         self.base = base
         self.constraints = constraints
@@ -31,7 +32,7 @@ class CreateSplineTool:
 
     def _get_initial_focus(self):
         """Retrieves the camera's focal point to avoid placing the curve too far into the depth."""
-        if hasattr(self.base, '_camera_controller') and self.base._camera_controller:
+        if hasattr(self.base, "_camera_controller") and self.base._camera_controller:
             return list(self.base._camera_controller.model_center)
         return [0.0, 0.0, 0.0]
 
@@ -43,7 +44,9 @@ class CreateSplineTool:
         if self.state == "WAITING_FIRST_POINT":
             start_pos = self._get_initial_focus()
             self.constraints.drag_start_world_pos = start_pos
-            self.constraints.drag_plane = self.constraints.build_drag_plane(Point3(*start_pos))
+            self.constraints.drag_plane = self.constraints.build_drag_plane(
+                Point3(*start_pos)
+            )
             self.constraints.drag_active_mask = 7
         else:
             self.constraints.drag_active_mask = self.constraints.axis_constraint_mask
@@ -53,7 +56,9 @@ class CreateSplineTool:
             self.points.append(world_pos)
             self.state = "DRAWING"
             self.constraints.drag_start_world_pos = world_pos
-            self.constraints.drag_plane = self.constraints.build_drag_plane(Point3(*world_pos))
+            self.constraints.drag_plane = self.constraints.build_drag_plane(
+                Point3(*world_pos)
+            )
             self._draw_preview()
 
     def on_mouse_move(self, m_pos: Point2):
@@ -63,8 +68,13 @@ class CreateSplineTool:
 
         self.constraints.drag_active_mask = self.constraints.axis_constraint_mask
 
-        if self.constraints.drag_active_mask == 7 and self.constraints.drag_start_world_pos:
-            self.constraints.drag_plane = self.constraints.build_drag_plane(Point3(*self.constraints.drag_start_world_pos))
+        if (
+            self.constraints.drag_active_mask == 7
+            and self.constraints.drag_start_world_pos
+        ):
+            self.constraints.drag_plane = self.constraints.build_drag_plane(
+                Point3(*self.constraints.drag_start_world_pos)
+            )
 
         world_pos = self.constraints.mouse_to_constrained_axis(m_pos)
         if world_pos:
@@ -77,8 +87,10 @@ class CreateSplineTool:
             return
         if key == "escape":
             self._discard_curve(keep_active=True)
-            if hasattr(self.base, 'hud'):
-                self.base.hud.setText("Curve discarded. Right click to start a new one.")
+            if hasattr(self.base, "hud"):
+                self.base.hud.setText(
+                    "Curve discarded. Right click to start a new one."
+                )
         elif key == "enter":
             self._commit_curve()
 
@@ -106,11 +118,13 @@ class CreateSplineTool:
         if len(self.points) >= 2:
             payload = {
                 "action": "create_interpolated_spline",
-                "points": copy.deepcopy(self.points)
+                "points": copy.deepcopy(self.points),
             }
             self.on_event_cb(ViewEventType.SHORTCUT, payload)
-            if hasattr(self.base, 'hud'):
-                self.base.hud.setText(f"Curve created with {len(self.points)} points. Ready for next.")
+            if hasattr(self.base, "hud"):
+                self.base.hud.setText(
+                    f"Curve created with {len(self.points)} points. Ready for next."
+                )
         self._discard_curve(keep_active=True)
 
     def _discard_curve(self, keep_active=False):

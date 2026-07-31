@@ -90,7 +90,9 @@ class ConstraintManager:
             return None
 
         hit = Point3()
-        if self.drag_plane.intersectsLine(hit, ray_origin, ray_origin + ray_dir * 100000.0):
+        if self.drag_plane.intersectsLine(
+            hit, ray_origin, ray_origin + ray_dir * 100000.0
+        ):
             return [hit[0], hit[1], hit[2]]
         return None
 

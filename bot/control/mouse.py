@@ -47,7 +47,9 @@ class MouseHandler:
         self.drag_offset = [0.0, 0.0, 0.0]
 
         self._right_was_down = False
-        self.create_tool = CreateSplineTool(self.base, self.constraints, self.base._on_event_cb)
+        self.create_tool = CreateSplineTool(
+            self.base, self.constraints, self.base._on_event_cb
+        )
 
         self.base.taskMgr.add(self.update, "MouseTask")
 

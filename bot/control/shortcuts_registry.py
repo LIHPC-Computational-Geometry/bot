@@ -28,15 +28,24 @@ __all__ = ["registry"]
 @bind(Key("escape"), scope="local")
 def quit_view(ctx):
     """Cancels spline creation if active, otherwise exits application."""
-    if hasattr(ctx, "mouse_handler") and ctx.mouse_handler and ctx.mouse_handler.creation_mode_enabled:
+    if (
+        hasattr(ctx, "mouse_handler")
+        and ctx.mouse_handler
+        and ctx.mouse_handler.creation_mode_enabled
+    ):
         ctx.mouse_handler.create_tool.handle_key_press("escape")
     else:
         sys.exit(0)
 
+
 @bind(Key("enter"), scope="local")
 def commit_curve(ctx):
     """Commits the current spline if creation mode is active."""
-    if hasattr(ctx, "mouse_handler") and ctx.mouse_handler and ctx.mouse_handler.creation_mode_enabled:
+    if (
+        hasattr(ctx, "mouse_handler")
+        and ctx.mouse_handler
+        and ctx.mouse_handler.creation_mode_enabled
+    ):
         ctx.mouse_handler.create_tool.handle_key_press("enter")
 
 
