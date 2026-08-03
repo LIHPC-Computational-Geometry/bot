@@ -237,11 +237,7 @@ class CADAdapter(BaseAdapter):
             coords_a, coords_b = self._model.get_end_points_coords(local_id)
             pt_a = f"({coords_a[0]:.2f}, {coords_a[1]:.2f}, {coords_a[2]:.2f})"
             pt_b = f"({coords_b[0]:.2f}, {coords_b[1]:.2f}, {coords_b[2]:.2f})"
-            return (
-                "Type: linear segment\n"
-                f"Endpoint A: {pt_a}\n"
-                f"Endpoint B: {pt_b}"
-            )
+            return f"Type: linear segment\nEndpoint A: {pt_a}\nEndpoint B: {pt_b}"
         except Exception as exc:
             return f"Error: {exc}"
 
