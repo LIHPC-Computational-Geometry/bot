@@ -3,9 +3,9 @@
 import unittest
 from unittest.mock import MagicMock
 
-from bot.viewer.tags import encode, CAD_NS, SPLINE_NS
+from bot.viewer.adapters.composite import CompositeAdapter
 from bot.viewer.contracts import ViewerCommandType, ViewEventType
-from bot.viewer.adapter import CompositeAdapter
+from bot.viewer.tags import CAD_NS, SPLINE_NS, encode
 
 
 class TestCompositeRegistry(unittest.TestCase):

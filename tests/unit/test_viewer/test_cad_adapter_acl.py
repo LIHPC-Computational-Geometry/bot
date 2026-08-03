@@ -4,10 +4,10 @@ import unittest
 from unittest.mock import MagicMock
 
 from bot.core.cad import CADModel
-from bot.viewer.serialize import bytes_to_point_list
-from bot.viewer.tags import encode, CAD_NS
+from bot.viewer.adapters.adapter_cad import CADAdapter
 from bot.viewer.contracts import SceneUpdateOp, ViewerCommandType, ViewEventType
-from bot.viewer.adapter import CADAdapter
+from bot.viewer.serialize import bytes_to_point_list
+from bot.viewer.tags import CAD_NS, encode
 
 GEO_FILE = "data/profil_1.geo"
 

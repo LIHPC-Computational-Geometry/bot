@@ -93,7 +93,7 @@ class TestRayPicker(unittest.TestCase):
             pt_2d.setY(1.0)
             return True
 
-        self.base.camLens.project.side_effect = mock_project
+        self.base.cam.node().getLens().project.side_effect = mock_project
 
         self.picker.queue = MagicMock()
         self.picker.queue.getNumEntries.return_value = 2
@@ -114,7 +114,7 @@ class TestRayPicker(unittest.TestCase):
         entry.getInto.return_value = solid
 
         # Simulate Panda3D failing to project the 3D point into 2D
-        self.base.camLens.project.return_value = False
+        self.base.cam.node().getLens().project.return_value = False
 
         priority, dist, depth = self.picker._get_priority_distance_depth(
             entry, Point2(1.0, 1.0)
@@ -175,7 +175,7 @@ class TestRayPicker(unittest.TestCase):
             pt_2d.setY(3.0)
             return True
 
-        self.base.camLens.project.side_effect = mock_project
+        self.base.cam.node().getLens().project.side_effect = mock_project
 
         priority, dist, depth = self.picker._get_priority_distance_depth(
             entry, Point2(1.0, 1.0)
