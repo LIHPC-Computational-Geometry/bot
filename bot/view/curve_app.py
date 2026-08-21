@@ -82,7 +82,7 @@ class CurveApp:
         # ==========================================
 
         self.selected: bool = False
-        self.line_thickness: float = 2.0
+        self.line_thickness: float = 2
 
         self.curve_pick_radius: float = 0.2
         self.cp_pick_radius: float = 0.4
@@ -183,8 +183,8 @@ class CurveApp:
     def __draw_curve(self):
         """Generates the main visual line of the curve."""
         lines = LineSegs()
-        lines.setThickness(float(self.line_thickness))
         if self.tag.split(":")[0] == "spline":
+            lines.setThickness(2)
             lines.setColor(0, 0.5, 1, 1)
         else:
             lines.setColor(1, 1, 1, 1)

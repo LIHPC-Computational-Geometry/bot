@@ -166,7 +166,7 @@ class MouseHandler:
             self.drag_offset = [0.0, 0.0, 0.0]
 
         self.base._scene.set_cp_color(
-            self.drag_curve_tag, self.drag_cp_index, [1, 0.5, 0, 1]
+            self.drag_curve_tag, self.drag_cp_index, [1, 0, 0.8, 1.0]
         )
         if getattr(self.base, "_scene", None) is not None:
             self.base._scene.show_axis_guide(
