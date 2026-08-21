@@ -132,8 +132,23 @@ def create_mode(ctx):
 
 
 @bind(Key("d"), scope="domain")
-def delete_mode(ctx):
-    return {"action": "cmd_delete_mode"}
+def delete_selected_curve(ctx):
+    """
+    Triggered when the 'd' key is pressed.
+    Retrieves the active curve from the mouse handler and sends a delete event.
+    Does nothing if no curve is currently selected.
+    """
+    if hasattr(ctx, "mouse_handler") and ctx.mouse_handler:
+        active_curve = ctx.mouse_handler.active_curve_tag
+
+        if active_curve is not None:
+            ctx.mouse_handler.set_edit_mode(False)
+            return {
+                "action": "delete_curve",
+                "curve_tag": active_curve
+            }
+
+    return None
 
 
 @bind(Hold("arrow_left", "arrow_right", "arrow_up", "arrow_down"), scope="local")

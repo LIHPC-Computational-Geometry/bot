@@ -45,7 +45,8 @@ class SplineAdapter(BaseAdapter):
             ViewEventType.HOVER: self._on_hover_event,
             ViewEventType.CURVE_SELECTED: self._on_curve_selected_event,
             ViewEventType.CP_PICK_END: self._on_cp_pick_end_event,
-            ViewEventType.CREATE_SPLINE: self._on_shortcut_event,
+            ViewEventType.CREATE_SPLINE: self._create_spline,
+            ViewEventType.SHORTCUT: self._on_shortcut_event,
         }
 
     # =========================================================================
@@ -85,7 +86,7 @@ class SplineAdapter(BaseAdapter):
         tag = event.get("tag") or event.get("curve_tag")
         return self._handle_hover(str(tag) if tag is not None else None)
 
-    def _on_shortcut_event(self, event: ViewEvent) -> list[ViewerCommand]:
+    def _create_spline(self, event: ViewEvent) -> list[ViewerCommand]:
         """Process domain-specific shortcuts like creating a new interpolated spline."""
         points = event.get("points")
         if points and len(points) >= 2:
@@ -109,6 +110,32 @@ class SplineAdapter(BaseAdapter):
         local_id = self._resolve_spline_tag(event)
         if local_id is not None:
             return self._handle_cp_pick_end(event, local_id)
+        return []
+
+    def _on_shortcut_event(self, event: ViewEvent) -> list[ViewerCommand]:
+        """
+        Process domain-specific shortcuts for Spline curves (e.g., deletion).
+        """
+        action = event.get("action")
+
+        if action == "delete_curve":
+            local_id = self._resolve_spline_tag(event)
+            if local_id is not None:
+                try:
+                    self._model.remove_curve(local_id)
+
+                    # Notify the child process explicitly to delete the geometry
+                    if self._update_callback is not None:
+                        self._update_callback(
+                            {
+                                "op": SceneUpdateOp.DELETE,
+                                "changed_curves": {},
+                                "deleted_curves": [encode(SPLINE_NS, local_id)],
+                            }
+                        )
+                except Exception() as exc:
+                    _logger.warning("SplineAdapter failed to delete curve: %s", exc)
+
         return []
 
     # =========================================================================

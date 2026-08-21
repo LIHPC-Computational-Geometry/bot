@@ -78,6 +78,8 @@ class SplineModel(Observable):
 
     def remove_curve(self, tag: str):
         if self._model.delete_curve(tag):
+            if tag in self.curves:
+                self.curves.remove(tag)
             self._notify_observers()
 
     def _evaluate(self, tag: str, sample: int) -> list[list[float]]:
