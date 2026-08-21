@@ -143,10 +143,7 @@ def delete_selected_curve(ctx):
 
         if active_curve is not None:
             ctx.mouse_handler.set_edit_mode(False)
-            return {
-                "action": "delete_curve",
-                "curve_tag": active_curve
-            }
+            return {"action": "delete_curve", "curve_tag": active_curve}
 
     return None
 
