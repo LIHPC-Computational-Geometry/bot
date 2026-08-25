@@ -18,7 +18,7 @@ Let's write a fully compliant adapter for a hypothetical custom polygonal model 
 
 ```python
 import logging
-from bot.viewer.adapter import Adapter
+from bot.viewer.adapters import Adapter
 from bot.viewer.contracts import ScenePayload, SceneUpdateOp, ViewEventType, ViewerCommandType, ViewerCommand, ViewEvent
 from bot.viewer.serialize import pack_curve_delta
 from bot.viewer.tags import encode, decode, is_namespaced
@@ -78,6 +78,7 @@ class CustomPolylineAdapter(Adapter):
                 "tag": str(tag),
                 "color": [0, 0.8, 1, 1]  # Highlight blue
             })
+
         return commands
 
     def update(self, model):
@@ -106,17 +107,17 @@ class CustomPolylineAdapter(Adapter):
 ```
 
 ### 2. Connect and Execute
-To initialize and bind your new adapter configuration directly via the Viewer:
 
+To initialize and bind your new adapter configuration directly via the Viewer:
 
 ```python
 from bot.viewer.viewer import Viewer
+
 # Assuming your models exist:
 my_model = CustomPolylineModel()
-
 viewer = Viewer()
+
 # Inject the custom adapter into the private interface adapter slot
 viewer._connect(CustomPolylineAdapter(my_model))
 viewer.run()
 ```
-

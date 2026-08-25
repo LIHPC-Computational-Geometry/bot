@@ -54,7 +54,15 @@ Once the user commits (e.g., by pressing Enter), the tool packages the coordinat
 
 ---
 
-## 4. The Shortcut Engine
+## 4. UI Overlays: `CursorManager`
+
+Located in `bot/control/cursor_manager.py`.
+
+The `CursorManager` manages the 2D visual cursor overlay and its visibility state within the active window. When specific interactive modes are enabled (such as drawing a new spline), the manager replaces the default OS cursor with a high-precision 2D vector crosshair anchored at the center of the viewport (`base.render2d`).
+
+---
+
+## 5. The Shortcut Engine
 
 Located in `bot/control/shortcuts/` and `bot/control/shortcuts_registry.py`.
 
