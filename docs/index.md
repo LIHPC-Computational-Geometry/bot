@@ -1,17 +1,23 @@
-# Bot — Developer Documentation
+# Bot - Developer Documentation
 
-Welcome to the **bot** developer documentation. This guide helps you understand the architecture, extend the viewer bridge for new models, and customize interaction behavior.
+Welcome to the **BOT** developer documentation. This guide is designed to help you understand the internal architecture of the project, learn how to extend it with new mathematical models, and customize user interactions.
 
 ## Documentation Map
 
-1. **[Architecture & IPC Flow](architecture.md)**: Parent/child split, IPC pipe, and event-vs-command model.
-2. **[Connecting a New Model](custom_model.md)**: `IViewable` bridge pattern for custom mathematical/geometric models.
-3. **[Customizing Callbacks](callbacks.md)**: User callbacks and default handler integration.
-4. **[Technical Reference V1](technical_reference_v1.md)**: Exhaustive reference for architecture, zero-copy/IPC behavior, raycasting, full API, and CI/CD.
+### 1. Architecture & Internals
+* **[Architecture & IPC Flow](architecture.md)**: Understand the multi-process design (Parent vs. Child process), the IPC communication pipe, and the geometry transport system.
+* **[Advanced Internals](advanced_internals.md)**: A deep dive into low-level mechanics, including the Rust (FerriSpline) integration and future memory optimizations.
 
-## Directory Layout of the Source Code
+### 2. API Reference
+Detailed documentation on the four main submodules that make up the project:
+* **[Core Module (`bot.core`)](api/core.md)**: The mathematical and geometric kernel (CAD and Splines).
+* **[Viewer Module (`bot.viewer`)](api/viewer.md)**: The public API, IPC contracts, and Anti-Corruption Layer (Adapters).
+* **[View Module (`bot.view`)](api/view.md)**: The Panda3D rendering engine and scene management.
+* **[Control Module (`bot.control`)](api/control.md)**: Input management, raycasting, camera logic, and shortcut registry.
 
-- `bot/core/`: Mathematical kernel with `CADModel` (gmsh) and `SplineModel` (FerriSpline-backed).
-- `bot/viewer/`: Public API and anti-corruption layer (viewer, adapters, contracts, serialization).
-- `bot/view/`: Panda3D rendering internals (`Scene`, `CurveApp`).
-- `bot/control/`: Input handling (mouse, keyboard, camera, picker).
+### 3. Guides & Customization
+Step-by-step guides for extending the platform:
+* **[Connecting a Custom Model](guides/custom_model.md)**: Using the Adapter protocol to bridge new mathematical models to the 3D viewer.
+* **[Customizing Callbacks](guides/callbacks.md)**: Intercepting UI events without breaking default behavior.
+* **[Custom Controls and Shortcuts](guides/custom-controls-and-shortcuts.md)**: Adding new mouse and keyboard interactions via the declarative registry.
+* **[Custom Rendering Tools](guides/custom_rendering_tools.md)**: Creating dynamic 3D tools (like drawing splines) and 2D HUD elements.

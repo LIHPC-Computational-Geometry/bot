@@ -1,205 +1,130 @@
 # Architecture and IPC Communication
 
-To keep the Python REPL (e.g., IPython) fully interactive while maintaining a fluid 60 FPS 3D rendering pipeline, **bot** implements a split-process architecture. OpenGL and windowing contexts (Panda3D) run inside a dedicated subprocess, isolated from the mathematical calculations.
+To keep the Python REPL (e.g., IPython) fully interactive while maintaining a fluid 60 FPS 3D rendering pipeline, **BOT** implements a split-process architecture.
 
-## Process Separation
+In this document, we will explore the different layers of this architecture using diagrams and simple explanations.
 
-1. **Parent Process (Main Process):**
-   * Hosts your Python script or interactive REPL session.
-   * Maintains the true mathematical models (`CADModel`, `SplineModel`).
-   * Runs a background daemon thread to continuously listen for incoming data from the UI.
-2. **Child Process (Subprocess):**
-   * Runs the Panda3D application engine on its main thread (required for macOS/OpenGL stability).
-   * Handles user input captures, camera matrices, and drawing loops.
+---
+
+## 1. Process Separation
+
+When you run **BOT**, you are actually running two separate programs (processes) that talk to each other. This is crucial because 3D rendering engines (like Panda3D) demand total control over the main thread to draw graphics smoothly. If we did heavy math on the same thread, the 3D window would freeze.
 
 ```mermaid
 flowchart TB
-    subgraph Parent["Parent process"]
-        REPL["IPython REPL"]
-        EventThread["Existing daemon event thread"]
+    subgraph Parent["Parent Process (Maths & Logic)"]
+        REPL["IPython / Script"]
         Models["CADModel / SplineModel"]
-        Adapters["CADAdapter / SplineAdapter ACL"]
-        Composite["CompositeAdapter"]
+        Adapters["Adapters (ACL)"]
         Viewer["Viewer"]
         REPL --> Models
-        Models --> Adapters --> Composite --> Viewer
-        EventThread -->|"handle_event"| Composite
+        Models --> Adapters --> Viewer
     end
-
-    subgraph Child["Child process — Panda3D"]
+    subgraph Child["Child Process (Panda3D)"]
         App["View"]
-        Scene["Scene.apply_patch"]
-        Mouse["MouseHandler — drag unchanged"]
+        Scene["Scene"]
+        Mouse["MouseHandler"]
         Mouse --> App
         App --> Scene
     end
-
-    Viewer -->|"add / update / delete"| App
-    App -->|"ViewEvent incl. cp_drag / cp_pick_end"| EventThread
+    Viewer -->|"Commands (ADD, UPDATE)"| App
+    App -->|"Events (CP_DRAG, HOVER)"| Viewer
 ```
 
-## Events vs. Commands
-
-Communication across the IPC Pipe is strictly divided into two distinct paradigms based on direction and intent:
-
-### 1. View Events (`ViewEventType`)
-* **Direction:** Child Process -> Parent Process.
-* **Intent:** Notification of a physical interaction performed by the user inside the 3D window (e.g., a mouse click, hovering over a curve, or releasing a dragged control point).
-* **Data structure:** Serializable dictionaries carrying interaction metadata (e.g., `curve_tag`, `world_pos`, `cp_index`).
-
-### 2. Viewer Commands (`ViewerCommandType` & `SceneUpdateOp`)
-* **Direction:** Parent Process -> Child Process.
-* **Intent:** Imperative instructions forcing the 3D window to update its state or render new frames.
-* **Categories:**
-  * **Topology Operations (`SceneUpdateOp`):** Heavyweight actions to synchronize 3D structures (`ADD`, `UPDATE`, `DELETE`).
-  * **Display State Commands (`ViewerCommandType`):** Lightweight UI adjustments (`HIGHLIGHT_CURVE`, `UPDATE_HUD`, `SET_EDIT_MODE`).
-
-### Comparative Summary
-
-| Feature | View Event | Viewer Command |
-| :--- | :--- | :--- |
-| **Origin** | Subprocess User Inputs | Parent Math Kernel/Script |
-| **Destination** | Background Listener Thread | 3D Engine Command Queue |
-| **Philosophy** | "Something happened in the canvas" | "Change your pixels right now" |
-| **Heavy Payloads** | No (metadata coordinates only) | Yes (contains float32 byte buffers for geometry) |
-
-```mermaid
-sequenceDiagram
-    participant Kernel as Processus Parent (Noyau/Main)
-    participant Pipe as Pipe Multiprocessing
-    participant ViewerProc as Processus Enfant (Panda3D)
-    participant Scene as bot.view.scene.Scene
-
-    Note over Kernel, ViewerProc: Phase d'initialisation et d'envoi de scène
-    Kernel->>Pipe: _send(SceneUpdateOp.ADD, ScenePayload)
-    Pipe->>ViewerProc: conn.recv()
-    ViewerProc->>Scene: _build_from_data(geom_data)
-
-    Note over Kernel, ViewerProc: Interaction de l'utilisateur (Ex: Déplacement)
-    Scene->>ViewerProc: on_event_cb(ViewEventType.CP_DRAG, data)
-    ViewerProc->>Pipe: conn.send()
-    Pipe->>Kernel: _conn.recv() via event_thread
-    Kernel->>Kernel: _default_event_handler(event_type, data)
-
-    Note over Kernel, ViewerProc: Le noyau résout les mathématiques et met à jour la scène
-    Kernel->>Pipe: _send(SceneUpdateOp.UPDATE, ScenePayload)
-    Pipe->>ViewerProc: cmd_queue.get_nowait()
-    ViewerProc->>Scene: apply_patch(payload)
-```
----
-```mermaid
-graph TD
-    Mouse[Événements Souris Panda3D] --> MH[MouseHandler]
-    Keyboard[Événements Clavier Panda3D] --> SR[ShortcutRegistry]
-
-    subgraph Couche de Contrôle ["bot.control"]
-        MH --> |Vérification survol/sélection| RP[RayPicker]
-        MH --> |Calcul projection 3D| CM[ConstraintManager]
-        MH --> |Délégation gestuelle| GT[GestureTracker]
-
-        SR --> |Enregistrement de touches| SB[SequenceBuffer]
-        SR --> |Évaluation des maintiens| GT
-    end
-
-    RP -.-> |pick_entry| Col[CollisionTraverser]
-    CM -.-> |mouse_to_constrained_axis| Plane[Plane / Math]
-
-    MH --> |Déclenche| CB[on_event_cb]
-    SR --> |Déclenche| CB
-
-    CB --> |Format ViewEvent| IPC[Pipe vers Processus Parent]
-```
+**How to read this diagram:**
+* **Parent Process (Top):** This is where your code lives. It holds the pure mathematical models and the `Viewer` API. It doesn't know how to draw pixels; it only calculates data.
+* **Child Process (Bottom):** This is the 3D window. It captures your mouse clicks (`MouseHandler`) and draws the 3D shapes (`Scene`), but it doesn't understand the complex math behind a CAD model.
+* **The Arrows in the Middle:** The two processes communicate by passing messages back and forth through an invisible tube (the IPC Pipe).
 
 ---
+
+## 2. The Anti-Corruption Layer (Observer Pattern)
+
+To keep the code clean, the core mathematical models (`bot.core`) are completely unaware of the 3D viewer. They don't know what color a line should be or how to draw a point.
+
+To bridge this gap, we use **Adapters**. They act as translators.
 
 ```mermaid
 classDiagram
     class Observable {
         -_observers: list
         +add_observer(observer)
-        +remove_observer(observer)
         #_notify_observers()
     }
-
     class CADModel {
-        +scale_factor: float
-        +add_point(coords, mesh_size)
-        +get_curve_discretization()
+        +add_point(coords)
     }
-
-    class SplineModel {
-        +curves: list
-        +add_curve(type, degree, control_points)
-        +move_control_point(tag, cp_index, new_pt)
-    }
-
     class Adapter {
         <<Protocol>>
         +bind_update(callback)
-        +unbind_update()
         +get_delta_load()
         +handle_event(event)
     }
-
     class Viewer {
         -_adapter: Adapter
         -_process: Process
-        +connect_models(cad_model, spline_model)
         +run()
-        -_dispatch_commands(commands)
     }
-
     Observable <|-- CADModel
-    Observable <|-- SplineModel
-
     Adapter <|-- CADAdapter
-    Adapter <|-- SplineAdapter
     Adapter <|-- CompositeAdapter
-
-    CompositeAdapter *-- Adapter : agrège
-
-    CADAdapter --> CADModel : observe
-    SplineAdapter --> SplineModel : observe
-
-    Viewer o-- Adapter : utilise
+    CompositeAdapter *-- Adapter
+    CADAdapter --> CADModel : observes
+    Viewer o-- Adapter : uses
 ```
+
+**How to read this diagram:**
+* **Observable:** Our math models (`CADModel`, `SplineModel`) inherit from this. When a point is added, the model just shouts "I changed!" (`_notify_observers()`).
+* **Adapters (`CADAdapter`, etc.):** They listen to the models. When they hear "I changed!", they grab the raw math data, translate it into a visual format (a `ScenePayload`), and hand it to the `Viewer`.
+* **Viewer:** Takes the translated payload and sends it to the 3D child process.
 
 ---
 
+## 3. The Communication Loop (Events vs. Commands)
+
+Because our application is split into two processes, a user action (like dragging a point with the mouse) requires a fast "ping-pong" of messages to update the screen.
+
 ```mermaid
-stateDiagram-v2
-    [*] --> Idle
+sequenceDiagram
+    participant Parent as Parent Process (Maths)
+    participant Pipe as IPC Pipe
+    participant Child as Child Process (Panda3D)
 
-    Idle --> Hover : Survol (RayPicker détecte "cp")
-    Hover --> Idle : Curseur quitte le "cp"
-    Hover --> CP_PICK_START : Clic gauche (left_down=True)
-
-    CP_PICK_START --> CP_DRAG : Mouvement souris (dragging_cp=True)
-    CP_DRAG --> CP_DRAG : update_cp_drag() & mouse_to_constrained_axis()
-
-    CP_DRAG --> CP_PICK_END : Relâchement clic (left_down=False)
-    CP_PICK_END --> Idle : _finalize_drag() (Émission ViewEventType.CP_PICK_END)
+    Parent->>Pipe: Send ViewerCommand (e.g., ADD scene)
+    Pipe->>Child: Read command & render 3D
+    Note over Parent, Child: User drags a control point with the mouse...
+    Child->>Pipe: Send ViewEvent (CP_DRAG)
+    Pipe->>Parent: Receive event in background thread
+    Parent->>Parent: Math kernel calculates new curve shape
+    Parent->>Pipe: Send ViewerCommand (UPDATE curve)
+    Pipe->>Child: Render the new curve
 ```
+
+**How to read this diagram:**
+1. **View Events (Child to Parent):** When the user drags a point, the Child Process says, *"The user moved their mouse here"* (`ViewEvent`). It does **not** try to calculate the new curve.
+2. **Calculation:** The Parent Process receives the mouse coordinates, runs the complex FerriSpline math, and figures out exactly what the new curve should look like.
+3. **Viewer Commands (Parent to Child):** The Parent Process sends back a command saying, *"Here are the new pixels to draw"* (`ViewerCommand`). The Child process simply updates the screen.
 
 ---
 
+## 4. Geometry Transport and Serialization
+
+Sending thousands of 3D coordinates (x, y, z) between two processes using standard Python lists would be very slow and cause lag. To maintain 60 FPS, we pack the data efficiently.
+
 ```mermaid
-flowchart
-    subgraph Processus Parent ["Domaine"]
-        Model[Modèles : CAD / Spline] --> |Extrait données| Adapt[CADAdapter / SplineAdapter]
-        Adapt --> |pack_curve_delta| Dct[Dictionnaire CurveDelta]
-        Dct --> |floats_to_bytes| Bytes[Canaux Binaires Float32]
+flowchart LR
+    subgraph ParentProc["Parent Process"]
+        Adapter[Adapter] --> |Extracts| Raw[Raw Coordinates]
+        Raw --> |Serialize| Bytes[Float32 Bytes]
         Bytes --> Payload[ScenePayload]
     end
-
-    Payload --> |Sérialisation IPC Pipe| ChildProc
-
-
-    subgraph Processus Enfant ["Rendu"]
-        ChildProc[Pipe Reader] --> Loader[payload_to_geom_data]
-        Loader --> |bytes_to_point_list| Pts[Listes imbriquées Python]
-        Pts --> Builder[Scene._build_from_data]
-        Builder --> App[CurveApp]
-        App --> |GeomVertexData| Panda[Panda3D Render]
+    Payload --> |IPC Pipe| ChildProc[Child Process]
+    subgraph ChildProcGroup["Child Process"]
+        ChildProc --> |Deserialize| Decoder[np.frombuffer]
+        Decoder --> Scene[Panda3D Scene]
     end
 ```
+
+**How to read this diagram:**
+* **Serialization (Left):** Before sending a curve to the viewer, the `Adapter` converts the list of numbers into a raw, compact block of memory (`Float32 Bytes`).
+* **Deserialization (Right):** When the 3D process receives this block, it uses NumPy (`np.frombuffer`) to read it instantly without having to parse individual numbers. This allows us to update complex CAD models in real-time!
