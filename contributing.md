@@ -60,12 +60,8 @@ uv run pytest tests/system/
 
 ## Documentation references
 
-- Developer index: [docs/index.md](doc/index.md)
-- Canonical technical reference: [docs/technical_reference_v1.md](doc/technical_reference_v1.md)
-- Focused guides:
-  - [docs/architecture.md](doc/architecture.md)
-  - [docs/guides/callbacks.md](doc/callbacks.md)
-  - [docs/guides/custom_model.md](doc/custom_model.md)
+- Developer index: [index.md](docs/index.md)
+- Global architecture: [architecture.md](docs/architecture.md)
 
 ## Troubleshooting
 

@@ -48,7 +48,7 @@ Viewer + ACL adapters                           -> process commands -> scene pat
 
 > **Why a subprocess?** OpenGL must run on the main thread of the process owning the window. Running Panda3D in a dedicated subprocess keeps the parent Python session responsive.
 
-See [doc/architecture.md](doc/architecture.md) for the focused IPC guide and [doc/technical_reference_v1.md](doc/technical_reference_v1.md) for the full architecture and data contracts.
+See [architecture.md](docs/architecture.md) for the focused IPC guide and the full architecture and data contracts.
 
 ---
 
@@ -108,8 +108,6 @@ At runtime:
 - parent serializes geometry with `floats_to_bytes` (`bot.viewer.serialize`),
 - `multiprocessing.Pipe` transports pickled `(cmd, data)` tuples,
 - child applies updates via `np.frombuffer(...)` on binary channels for patch updates.
-
-See [doc/technical_reference_v1.md](doc/technical_reference_v1.md#3-core-mechanisms) for the full schema and flow.
 
 ---
 
@@ -173,7 +171,7 @@ Build static HTML into `docs/`:
 uv run pdoc ./bot -o ./docs
 ```
 
-Developer guides are indexed in [doc/index.md](doc/index.md).
+Developer guides are indexed in [index.md](docs/index.md).
 
 ### 5. Continuous integration
 

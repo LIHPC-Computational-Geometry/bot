@@ -4,9 +4,8 @@ Welcome to the **BOT** developer documentation. This guide is designed to help y
 
 ## Documentation Map
 
-### 1. Architecture & Internals
+### 1. Architecture
 * **[Architecture & IPC Flow](architecture.md)**: Understand the multi-process design (Parent vs. Child process), the IPC communication pipe, and the geometry transport system.
-* **[Advanced Internals](advanced_internals.md)**: A deep dive into low-level mechanics, including the Rust (FerriSpline) integration and future memory optimizations.
 
 ### 2. API Reference
 Detailed documentation on the four main submodules that make up the project:
