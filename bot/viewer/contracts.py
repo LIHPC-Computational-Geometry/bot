@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import Any, Literal, NotRequired, TypedDict, Union
+from typing import Any, Literal, NotRequired, TypedDict
 
 from bot.core.spline import BEZIER_TYP, NURBS_TYP
 
@@ -73,6 +73,8 @@ class ViewEventType(IntEnum):
 
     # Legitimate: Domain shortcut fired in the child; payload is ``{"action": str, ...}``.
     SHORTCUT = 106
+
+    CREATE_SPLINE = 107
 
 
 ParentCommand = SceneUpdateOp | ViewerCommandType
@@ -179,15 +181,24 @@ class EventShortcut(TypedDict):
     action: str
 
 
-ViewEvent = Union[
-    EventHover,
-    EventCurveSelected,
-    EventCPPickStart,
-    EventCPDrag,
-    EventCPPickEnd,
-    EventPick,
-    EventShortcut,
-]
+class EventCreateSpline(TypedDict):
+    """Payload for creating a new spline from the View."""
+
+    event_type: Literal[ViewEventType.CREATE_SPLINE]
+    points: list[list[float]]
+    degree: int
+
+
+ViewEvent = (
+    EventHover
+    | EventCurveSelected
+    | EventCPPickStart
+    | EventCPDrag
+    | EventCPPickEnd
+    | EventPick
+    | EventShortcut
+    | EventCreateSpline
+)
 
 
 class CmdHighlightCurve(TypedDict):
@@ -217,10 +228,10 @@ class CmdSetAxisConstraint(TypedDict):
     mask: int
 
 
-ViewerCommand = Union[
-    CmdHighlightCurve,
-    CmdUpdateHud,
-    CmdSetEditMode,
-    CmdSetActiveCurve,
-    CmdSetAxisConstraint,
-]
+ViewerCommand = (
+    CmdHighlightCurve
+    | CmdUpdateHud
+    | CmdSetEditMode
+    | CmdSetActiveCurve
+    | CmdSetAxisConstraint
+)

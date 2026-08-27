@@ -1,10 +1,15 @@
 from __future__ import annotations
+
 import multiprocessing as mp
 import threading
-from typing import Callable, Optional, Any
-from bot.viewer.adapter import Adapter, CADAdapter, CompositeAdapter
+from collections.abc import Callable
+from typing import Any
+
 from bot.core.cad import CADModel
 from bot.core.spline import SplineModel
+from bot.viewer.adapters import Adapter
+from bot.viewer.adapters.adapter_cad import CADAdapter
+from bot.viewer.adapters.composite import CompositeAdapter
 from bot.viewer.contracts import (
     ParentCommand,
     ScenePayload,
@@ -88,7 +93,7 @@ class Viewer:
 
     def __init__(self, config_filename: str = "bot_config.toml"):
         self._config_filename = config_filename
-        self._adapter: Optional["Adapter"] = None
+        self._adapter: Adapter | None = None
         self._conn = None  # parent end of the Pipe
         self._process = None  # Panda3D subprocess
         self._event_thread = None  # event listening thread
@@ -103,16 +108,16 @@ class Viewer:
 
     def connect_models(
         self,
-        cad_model: "CADModel",
-        spline_model: Optional["SplineModel"] = None,
-    ) -> "Viewer":
+        cad_model: CADModel,
+        spline_model: SplineModel | None = None,
+    ) -> Viewer:
         """Convenience wrapper that builds a CompositeAdapter from core models."""
 
         if spline_model is None:
             return self._connect(CompositeAdapter({"cad": CADAdapter(cad_model)}))
         return self._connect(CompositeAdapter.from_models(cad_model, spline_model))
 
-    def disconnect(self) -> "Viewer":
+    def disconnect(self) -> Viewer:
         """Detach the viewer from the current adapter."""
         if self._adapter is not None:
             self._adapter.unbind_update()
@@ -123,7 +128,7 @@ class Viewer:
 
         return self
 
-    def run(self) -> "Viewer":
+    def run(self) -> Viewer:
         """
         Launches the viewer in a separate subprocess (non-blocking).
         Returns self for chaining.
@@ -158,7 +163,7 @@ class Viewer:
         if self._conn is not None:
             try:
                 self._send(ViewerCommandType.EXIT, None)
-            except Exception:
+            except Exception():
                 pass
 
         if self._process is not None:
@@ -176,40 +181,40 @@ class Viewer:
 
     def add_callback(
         self, event_type: ViewEventType, callback: VisualCallback
-    ) -> "Viewer":
+    ) -> Viewer:
         """Associate a personalized function for a specific event."""
         self._callbacks[event_type] = callback
         return self
 
-    def remove_callback(self, event_type: ViewEventType) -> "Viewer":
+    def remove_callback(self, event_type: ViewEventType) -> Viewer:
         """Delete the personalized callback for an event."""
         self._callbacks.pop(event_type, None)
         return self
 
-    def highlight_curve(self, tag: str, color: list) -> "Viewer":
+    def highlight_curve(self, tag: str, color: list) -> Viewer:
         """Colors the geometry associated with a tag."""
         self._send(ViewerCommandType.HIGHLIGHT_CURVE, {"tag": tag, "color": color})
         return self
 
-    def set_hud_text(self, text: str) -> "Viewer":
+    def set_hud_text(self, text: str) -> Viewer:
         """Updates the text displayed in an overlay on the screen."""
         self._send(ViewerCommandType.UPDATE_HUD, {"text": text})
         return self
 
     def set_edit_mode(
-        self, enabled: bool, curve_tag: Optional[str | int] = None
-    ) -> "Viewer":
+        self, enabled: bool, curve_tag: [str | int] | None = None
+    ) -> Viewer:
         self._send(
             ViewerCommandType.SET_EDIT_MODE,
             {"enabled": enabled, "curve_tag": curve_tag},
         )
         return self
 
-    def set_active_curve(self, curve_tag: Optional[str | int]) -> "Viewer":
+    def set_active_curve(self, curve_tag: [str | int] | None) -> Viewer:
         self._send(ViewerCommandType.SET_ACTIVE_CURVE, {"curve_tag": curve_tag})
         return self
 
-    def set_axis_constraint(self, mask: int) -> "Viewer":
+    def set_axis_constraint(self, mask: int) -> Viewer:
         try:
             normalized = int(mask)
         except TypeError, ValueError:
@@ -218,7 +223,7 @@ class Viewer:
         self._send(ViewerCommandType.SET_AXIS_CONSTRAINT, {"mask": normalized})
         return self
 
-    def delete_curve(self, tag: str) -> "Viewer":
+    def delete_curve(self, tag: str) -> Viewer:
         """
         Supprime explicitement une courbe de la scène.
         Génère un payload 'delete' complet pour le processus enfant.
@@ -233,7 +238,7 @@ class Viewer:
 
     def move_control_point(
         self, curve_tag: str, cp_index: int, new_pos: list[float]
-    ) -> "Viewer":
+    ) -> Viewer:
         """Move a control point via the adapter event path from IPython."""
         if self._adapter is None:
             self.set_hud_text("No adapter connected.")
@@ -253,7 +258,7 @@ class Viewer:
     # INTERNAL FUNCTIONS
     # =========================================================================
 
-    def _connect(self, adapter: "Adapter") -> "Viewer":
+    def _connect(self, adapter: Adapter) -> Viewer:
         """
         Connects this viewer to an Adapter source.
         Can be called before or after run().
@@ -272,7 +277,7 @@ class Viewer:
         return self
 
     def _create_default_handler(
-        self, adapter: "Adapter"
+        self, adapter: Adapter
     ) -> Callable[[ViewEventType, Any], None]:
         """Create a closure for translate event into visual commands."""
 
@@ -286,7 +291,7 @@ class Viewer:
 
         return handler
 
-    def _on_delta(self, payload: "ScenePayload") -> None:
+    def _on_delta(self, payload: ScenePayload) -> None:
         """Forward adapter deltas to the child process."""
         op = payload.get("op", SceneUpdateOp.UPDATE)
         self._send(op, payload)
@@ -299,7 +304,7 @@ class Viewer:
             except BrokenPipeError:
                 pass
 
-    def _dispatch_commands(self, commands: list["ViewerCommand"]) -> None:
+    def _dispatch_commands(self, commands: list[ViewerCommand]) -> None:
         for command in commands:
             cmd = command.get("cmd")
             match cmd:
@@ -347,14 +352,14 @@ class Viewer:
 
                 except EOFError, BrokenPipeError, AttributeError:
                     break
-                except Exception:
+                except Exception():
                     pass
 
         self._event_thread = threading.Thread(target=_listen, daemon=True)
         self._event_thread.start()
 
     @staticmethod
-    def _build_view_event(event_type: ViewEventType, data) -> "ViewEvent":
+    def _build_view_event(event_type: ViewEventType, data) -> ViewEvent:
         """Build a strict typing event from pipe"""
         if isinstance(data, dict):
             return {"event_type": event_type, **data}

@@ -1,6 +1,7 @@
-import gmsh
 import numbers
 from pathlib import Path
+
+import gmsh
 
 from bot.core.observable import Observable
 
@@ -81,7 +82,7 @@ class CADModel(Observable):
         self.__synchronize()
 
     def _recompute_bounds(self):
-        node_tags, coords, _ = gmsh.model.mesh.getNodes()
+        _node_tags, coords, _ = gmsh.model.mesh.getNodes()
         # The map will be used later to store some geom info
         # node_map = {tag: i for i, tag in enumerate(node_tags)}
         self.points = [
@@ -246,9 +247,7 @@ class CADModel(Observable):
         for curve_tag in self.get_curve_tags():
             # get curve end points
             end_points = self.get_end_points(curve_tag)
-            if end_points[0] == point_tag:
-                curves.append(curve_tag)
-            elif end_points[1] == point_tag:
+            if end_points[0] == point_tag or end_points[1] == point_tag:
                 curves.append(curve_tag)
         return curves
 
@@ -315,7 +314,7 @@ class CADModel(Observable):
         """
         curves = gmsh.model.getAdjacencies(2, face_tag)[1]
         corners = []
-        for i_curve in range(0, len(curves)):
+        for i_curve in len(curves):
             j_index = i_curve - 1
             if i_curve == 0:
                 j_index = len(curves) - 1
@@ -400,9 +399,7 @@ class CADModel(Observable):
         # type 1 = edge, type 2 = triangle, type 15 = point
         surf_tags = self.get_surface_tags()
         for i in surf_tags:
-            element_types, element_tags, node_tags_list = gmsh.model.mesh.getElements(
-                2, i
-            )
+            _, element_tags, node_tags_list = gmsh.model.mesh.getElements(2, i)
             faces = []
             for elem_tags, elem_node_tags in zip(element_tags, node_tags_list):
                 for i in range(len(elem_tags)):

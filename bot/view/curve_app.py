@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+import numpy as np
 from panda3d.core import (
     BitMask32,
     CollisionNode,
@@ -13,7 +13,7 @@ from panda3d.core import (
     LineSegs,
     NodePath,
 )
-import numpy as np
+
 from bot.core.spline import SplineModel
 
 MASK_CURVE_PICK = BitMask32.bit(1)
@@ -25,10 +25,10 @@ class CurveApp:
     Represents a 3D curve (visual and physical) manipulable in the editor.
     """
 
-    def __init__(self, tag: str, curve_data: Dict):
+    def __init__(self, tag: str, curve_data: dict):
         self.tag: str = str(tag)
-        self.edges: List = curve_data["edges"]
-        self.points: List = curve_data["points"]
+        self.edges: list = curve_data["edges"]
+        self.points: list = curve_data["points"]
         self.type: str = curve_data["type"]
         self.degree = curve_data.get("degree")
         self.weights = curve_data.get("weights") or None
@@ -38,29 +38,29 @@ class CurveApp:
         # ==========================================
 
         # 1. Global object root
-        self.root_node: Optional[NodePath] = None
+        self.root_node: NodePath | None = None
 
         # 2. Node of the curve
-        self.curve_render_node: Optional[NodePath] = None
-        self.curve_geom_node: Optional[NodePath] = None
-        self.curve_collision_node: Optional[NodePath] = None
+        self.curve_render_node: NodePath | None = None
+        self.curve_geom_node: NodePath | None = None
+        self.curve_collision_node: NodePath | None = None
 
         # 3. Node of control points
-        self.cp_render_node: Optional[NodePath] = None
-        self.cp_points_geom_node: Optional[NodePath] = None
-        self.cp_lines_geom_node: Optional[NodePath] = None
-        self.cp_collision_node: Optional[NodePath] = None
+        self.cp_render_node: NodePath | None = None
+        self.cp_points_geom_node: NodePath | None = None
+        self.cp_lines_geom_node: NodePath | None = None
+        self.cp_collision_node: NodePath | None = None
 
         # 4. Node of knots
-        self.knots_render_node: Optional[NodePath] = None
-        self.knots_geom_node: Optional[NodePath] = None
+        self.knots_render_node: NodePath | None = None
+        self.knots_geom_node: NodePath | None = None
 
         # ==========================================
         # CONTROLE POINTS
         # ==========================================
 
         self.control_points = curve_data.get("control_points", []) or None
-        self.cp_color: Optional[List[List[float]]] = None
+        self.cp_color: [list[list[float]]] | None = None
         if self.control_points is not None:
             self.cp_color = [
                 [0.5, 0.5, 0.5, 1.0] for _ in range(len(self.control_points))
@@ -82,7 +82,7 @@ class CurveApp:
         # ==========================================
 
         self.selected: bool = False
-        self.line_thickness: float = 2.0
+        self.line_thickness: float = 2
 
         self.curve_pick_radius: float = 0.2
         self.cp_pick_radius: float = 0.4
@@ -102,10 +102,11 @@ class CurveApp:
         color_writer = GeomVertexWriter(vdata, "color")
         prim = GeomPoints(Geom.UHDynamic)
 
-        vertex_index = 0
         num_points = len(self.points)
 
-        for i in range(self.degree, len(self.knots) - self.degree):
+        for vertex_index, i in enumerate(
+            range(self.degree, len(self.knots) - self.degree)
+        ):
             t = self.knots[i]
 
             idx_float = t * (num_points - 1)
@@ -126,7 +127,6 @@ class CurveApp:
             vertex_writer.addData3f(*pt)
             color_writer.addData4f(*self.knots_color[i - self.degree])
             prim.addVertex(vertex_index)
-            vertex_index += 1
 
         prim.closePrimitive()
         geom = Geom(vdata)
@@ -183,11 +183,11 @@ class CurveApp:
     def __draw_curve(self):
         """Generates the main visual line of the curve."""
         lines = LineSegs()
-        lines.setThickness(float(self.line_thickness))
         if self.tag.split(":")[0] == "spline":
-            lines.setColor(0, 1, 1, 1)
+            lines.setThickness(2)
+            lines.setColor(0, 0.5, 1, 1)
         else:
-            lines.setColor(1, 0, 1, 1)
+            lines.setColor(1, 1, 1, 1)
 
         for idxA, idxB in self.edges:
             lines.moveTo(*self.points[idxA])
@@ -309,13 +309,13 @@ class CurveApp:
         if self.knots_render_node:
             self.knots_render_node.removeNode()
 
-    def set_cp_color(self, cp_index: int, color: List[float]):
+    def set_cp_color(self, cp_index: int, color: list[float]):
         """Updates the color of a specific control point and refreshes its rendering."""
         self.cp_color[cp_index] = color
         if self.cp_render_node is not None:
             self.__draw_control_points(self.cp_render_node)
 
-    def set_color(self, color: List[float]):
+    def set_color(self, color: list[float]):
         """Sets the color of the main curve geometry."""
         if self.curve_render_node:
             self.curve_render_node.setColor(*color[:4], 1)
@@ -343,7 +343,7 @@ class CurveApp:
                 cnp.node().setIntoCollideMask(current_mask)
                 cnp.setCollideMask(current_mask)
 
-    def preview_evaluate(self, cp_index: int, new_pos: List[float]):
+    def preview_evaluate(self, cp_index: int, new_pos: list[float]):
         """Updates a control point position and re-evaluates the curve for real-time preview."""
         if not self.control_points or not (0 <= cp_index < len(self.control_points)):
             return

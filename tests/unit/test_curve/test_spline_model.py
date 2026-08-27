@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from bot.core.spline import SplineModel, BEZIER_TYP, NURBS_TYP
+from bot.core.spline import BEZIER_TYP, NURBS_TYP, SplineModel
 
 
 class _MockObserver:

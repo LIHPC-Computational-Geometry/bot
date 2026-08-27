@@ -8,9 +8,9 @@ side-effects and input-validation errors on getClosestPoint.
 import unittest
 
 from bot.core.cad import CADModel
-from bot.viewer.tags import CAD_NS, encode, prefix
+from bot.viewer.adapters.adapter_cad import CADAdapter
 from bot.viewer.contracts import SceneUpdateOp
-from bot.viewer.adapter import CADAdapter
+from bot.viewer.tags import CAD_NS, encode, prefix
 
 
 class _MockObserver:

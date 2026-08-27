@@ -1,5 +1,5 @@
-import unittest
 import sys
+import unittest
 from pathlib import Path
 
 from panda3d.core import Plane, Point2, Point3, Vec3
@@ -287,11 +287,11 @@ class TestConstraintManager(unittest.TestCase):
 
     def test_mouse_to_ray_extrude_fails(self):
         """Tests that _mouse_to_ray returns None when camLens.extrude fails."""
-        self.manager.base.camLens.extrude.return_value = False
+        self.manager.base.cam.node().getLens().extrude.return_value = False
         origin, direction = self.manager._mouse_to_ray(Point2(0, 0))
         self.assertIsNone(origin)
         self.assertIsNone(direction)
-        self.manager.base.camLens.extrude.assert_called_once()
+        self.manager.base.cam.node().getLens().extrude.assert_called_once()
 
     def test_mouse_to_ray_succeeds_general_case(self):
         """
@@ -305,7 +305,7 @@ class TestConstraintManager(unittest.TestCase):
             p_to.x, p_to.y, p_to.z = 0, 10, 0
             return True
 
-        self.manager.base.camLens.extrude.side_effect = mock_extrude
+        self.manager.base.cam.node().getLens().extrude.side_effect = mock_extrude
 
         # Mock coordinate system transforms to be identity for simplicity
         self.manager.base.render.getRelativePoint.side_effect = lambda cam, point: point
@@ -333,7 +333,7 @@ class TestConstraintManager(unittest.TestCase):
             p_to.x, p_to.y, p_to.z = 10, 5, 0
             return True
 
-        self.manager.base.camLens.extrude.side_effect = mock_extrude
+        self.manager.base.cam.node().getLens().extrude.side_effect = mock_extrude
         self.manager.base.render.getRelativePoint.side_effect = lambda cam, point: point
         self.manager.base.render.getRelativeVector.side_effect = lambda cam, vec: vec
 

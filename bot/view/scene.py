@@ -1,17 +1,18 @@
-from typing import Optional, List, Dict, Any
+from typing import Any
+
 from panda3d.core import (
+    AmbientLight,
+    DirectionalLight,
+    LColor,
     LineSegs,
     NodePath,
-    LColor,
-    Vec4,
     Vec3,
-    DirectionalLight,
-    AmbientLight,
+    Vec4,
 )
 
 from bot.view.curve_app import CurveApp
 from bot.viewer.contracts import ScenePayload
-from bot.viewer.serialize import payload_to_geom_data
+from bot.viewer.serialize import curve_delta_to_curve_info, payload_to_geom_data
 
 _DEFAULT_BOUNDS = {
     "min": [0, 0, 0],
@@ -59,26 +60,26 @@ class Scene:
     Delegates curve logic to CurveApp.
     """
 
-    def __init__(self, base, geom_data: Dict[str, Any], settings: Dict[str, Any]):
+    def __init__(self, base, geom_data: dict[str, Any], settings: dict[str, Any]):
         self.base = base
         self._geom_data = geom_data
 
-        self.background_color: List[float] = settings.get(
+        self.background_color: list[float] = settings.get(
             "background_color", [0.1, 0.1, 0.12]
         )
         self.base.set_background_color(self.background_color)
 
         self.line_thickness: float = float(settings.get("line_thickness", 2.0))
-        self.curves: Dict[str, CurveApp] = {}
+        self.curves: dict[str, CurveApp] = {}
 
-        self.active_curve_tag: Optional[str] = None
+        self.active_curve_tag: str | None = None
         self.edit_mode_enabled: bool = False
         self.axis_constraint_mask: int = 3
 
-        self._constraint_guide_np: Optional[NodePath] = None
-        self._world_axes_np: Optional[NodePath] = None
-        self._transform_gizmo_np: Optional[NodePath] = None
-        self._constraint_guide_origin: Optional[List[float]] = None
+        self._constraint_guide_np: NodePath | None = None
+        self._world_axes_np: NodePath | None = None
+        self._transform_gizmo_np: NodePath | None = None
+        self._constraint_guide_origin: list[float] | None = None
         self._constraint_guide_visible: bool = False
         self.last_units_per_pixel: float = 0.01
 
@@ -100,17 +101,17 @@ class Scene:
         self.base.accept("zoom_changed", self._on_zoom_changed)
 
     @property
-    def bounds(self) -> Dict[str, Any]:
+    def bounds(self) -> dict[str, Any]:
         """Returns the dimensions of the scene's bounding box."""
         return self._geom_data.get("bounds", _DEFAULT_BOUNDS)
 
-    def _get_curve(self, tag: Any) -> Optional[CurveApp]:
+    def _get_curve(self, tag: Any) -> CurveApp | None:
         """Safe utility to retrieve a curve by its namespaced tag."""
         if tag is None:
             return None
         return self.curves.get(str(tag))
 
-    def _build_from_data(self, geom_data: Dict[str, Any]) -> NodePath:
+    def _build_from_data(self, geom_data: dict[str, Any]) -> NodePath:
         """
         Builds the geometry tree from CAD data.
         """
@@ -136,13 +137,13 @@ class Scene:
 
         return geom_root
 
-    def set_curve_color(self, tag: Any, color: List[float]):
+    def set_curve_color(self, tag: Any, color: list[float]):
         """Modifies the color of a curve."""
         curve = self._get_curve(tag)
         if curve is not None:
             curve.set_color(color)
 
-    def set_cp_color(self, tag: Any, cp_index: int, color: List[float]):
+    def set_cp_color(self, tag: Any, cp_index: int, color: list[float]):
         """Modifies the color of a specific control point."""
         curve = self._get_curve(tag)
         if curve is not None:
@@ -163,7 +164,7 @@ class Scene:
         for curve_tag, curve in self.curves.items():
             curve.is_selected(self.edit_mode_enabled and normalized == curve_tag)
 
-    def preview_evaluate(self, tag: str, cp_index: int, new_pos: List[float]):
+    def preview_evaluate(self, tag: str, cp_index: int, new_pos: list[float]):
         """Previews the displacement of a control point in real-time."""
         curve = self._get_curve(tag)
         if curve is not None:
@@ -189,7 +190,7 @@ class Scene:
         return max(2.0, float(max_size) * 0.15)
 
     def _draw_axis_line(
-        self, root: NodePath, origin: List[float], axis: str, length: float
+        self, root: NodePath, origin: list[float], axis: str, length: float
     ):
         colors = {"x": (1, 0, 0, 0.2), "y": (0, 1, 0, 0.2), "z": (0, 0, 1, 0.2)}
         vectors = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}
@@ -210,7 +211,7 @@ class Scene:
 
         root.attachNewNode(ls.create())
 
-    def _update_transform_gizmo(self, origin: List[float], mask: int):
+    def _update_transform_gizmo(self, origin: list[float], mask: int):
         if self._transform_gizmo_np is None:
             return
 
@@ -224,14 +225,14 @@ class Scene:
         if mask & 4:
             self._draw_axis_line(self._transform_gizmo_np, origin, "z", length)
 
-    def show_axis_guide(self, origin: List[float], mask: int):
+    def show_axis_guide(self, origin: list[float], mask: int):
         self._constraint_guide_visible = True
         self.update_axis_guide(origin, mask)
         self._constraint_guide_np.show()
         if self._transform_gizmo_np is not None:
             self._transform_gizmo_np.show()
 
-    def update_axis_guide(self, origin: List[float], mask: int):
+    def update_axis_guide(self, origin: list[float], mask: int):
         if self._constraint_guide_np is None:
             return
 
@@ -261,7 +262,7 @@ class Scene:
     # RELOADING AND LIFECYCLE
     # =========================================================================
 
-    def rebuild(self, geom_data: Dict[str, Any]):
+    def rebuild(self, geom_data: dict[str, Any]):
         """Rebuilds the scene geometry with new data."""
         self._geom_data = geom_data
         if self.geom_node is not None:
@@ -272,8 +273,19 @@ class Scene:
         """Apply incremental curve geometry updates from the parent process."""
         for tag, delta in payload.get("changed_curves", {}).items():
             curve = self._get_curve(tag)
+
             if curve is None:
+                curve_info = curve_delta_to_curve_info(str(tag), delta)
+                new_curve = CurveApp(str(tag), curve_info)
+                new_curve.update_collision_sizes(self.last_units_per_pixel)
+                new_curve.line_thickness = self.line_thickness
+                self.curves[str(tag)] = new_curve
+
+                if self.geom_node is not None:
+                    root_node = self.geom_node.attachNewNode(f"curve_{tag}")
+                    new_curve.attach_curve_node(root_node)
                 continue
+
             geometry = delta["geometry"]
             curve.apply_geometry_bytes(
                 geometry["curve_vertices"], delta["vertex_count"]
@@ -314,7 +326,7 @@ class Scene:
         ):
             self.gizmo.root.removeNode()
 
-    def apply_settings(self, settings: Dict[str, Any]):
+    def apply_settings(self, settings: dict[str, Any]):
         """Allows hot-reloading certain parameters without rebuilding everything."""
         if "background_color" in settings:
             self.background_color = settings["background_color"]

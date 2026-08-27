@@ -19,7 +19,7 @@ import sys
 from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import TextNode
 
-from bot.control.shortcuts import Key, Seq, Wheel, Drag, Hold, Click, bind, registry
+from bot.control.shortcuts import Click, Drag, Hold, Key, Seq, Wheel, bind, registry
 
 # Importing this module registers all handlers on the default ``registry``.
 __all__ = ["registry"]
@@ -27,7 +27,26 @@ __all__ = ["registry"]
 
 @bind(Key("escape"), scope="local")
 def quit_view(ctx):
-    sys.exit(0)
+    """Cancels spline creation if active, otherwise exits application."""
+    if (
+        hasattr(ctx, "mouse_handler")
+        and ctx.mouse_handler
+        and ctx.mouse_handler.creation_mode_enabled
+    ):
+        ctx.messenger.send("cmd_cancel_create")
+    else:
+        sys.exit(0)
+
+
+@bind(Key("enter"), scope="local")
+def commit_curve(ctx):
+    """Commits the current spline if creation mode is active."""
+    if (
+        hasattr(ctx, "mouse_handler")
+        and ctx.mouse_handler
+        and ctx.mouse_handler.creation_mode_enabled
+    ):
+        ctx.messenger.send("cmd_commit_create")
 
 
 @bind(Key("f5"), scope="local")
@@ -105,6 +124,28 @@ _register_axis_mask_keys()
 @bind(Key("p"), scope="local")
 def toggle_marker(ctx):
     ctx.messenger.send("cmd_toggle_marker")
+
+
+@bind(Key("n"), scope="local")
+def create_mode(ctx):
+    ctx.messenger.send("cmd_create_mode")
+
+
+@bind(Key("d"), scope="domain")
+def delete_selected_curve(ctx):
+    """
+    Triggered when the 'd' key is pressed.
+    Retrieves the active curve from the mouse handler and sends a delete event.
+    Does nothing if no curve is currently selected.
+    """
+    if hasattr(ctx, "mouse_handler") and ctx.mouse_handler:
+        active_curve = ctx.mouse_handler.active_curve_tag
+
+        if active_curve is not None:
+            ctx.mouse_handler.set_edit_mode(False)
+            return {"action": "delete_curve", "curve_tag": active_curve}
+
+    return None
 
 
 @bind(Hold("arrow_left", "arrow_right", "arrow_up", "arrow_down"), scope="local")
