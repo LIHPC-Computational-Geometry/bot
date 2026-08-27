@@ -8,21 +8,28 @@ from bot.math.constraints import ConstraintManager
 
 class MouseHandler:
     """
-    Handles mouse input and dispatches camera commands via the Panda3D messenger.
+    Handles mouse input for domain picking and camera gestures.
 
-    - Left-button drag          → ``cmd_rotate``
-    - Shift + left-button drag  → ``cmd_pan``
-    - Scroll wheel              → ``cmd_zoom``
+    Domain (priority):
+    - Hover → ``ViewEventType.HOVER``
+    - Left click on curve → ``ViewEventType.CURVE_SELECTED``
+    - Control-point drag → ``CP_PICK_START`` / ``CP_DRAG`` / ``CP_PICK_END``
+
+    Local (via shortcut ``GestureTracker``):
+    - Left-button drag → ``cmd_pan``
+    - Scroll wheel → ``cmd_zoom``
     """
 
-    def __init__(self, base):
+    def __init__(self, base, gesture_tracker=None):
         """
-        Register mouse-wheel bindings and start the per-frame update task.
+        Register the per-frame update task.
 
         Args:
             base: Panda3D ShowBase instance.
+            gesture_tracker: Optional ``GestureTracker`` from the shortcut registry.
         """
         self.base = base
+        self.gesture_tracker = gesture_tracker
         self.prev_mouse_pos = None
         self._left_was_down = False
 
@@ -39,15 +46,10 @@ class MouseHandler:
         self.drag_last_valid_world_pos = None
         self.drag_offset = [0.0, 0.0, 0.0]
 
-        # Bindings molette souris
-        self.base.accept(
-            "wheel_up", lambda: self.base.messenger.send("cmd_zoom", [0.9])
-        )
-        self.base.accept(
-            "wheel_down", lambda: self.base.messenger.send("cmd_zoom", [1.1])
-        )
-
         self.base.taskMgr.add(self.update, "MouseTask")
+
+    def set_gesture_tracker(self, gesture_tracker) -> None:
+        self.gesture_tracker = gesture_tracker
 
     def set_edit_mode(self, enabled: bool, curve_tag=None):
         self.edit_mode_enabled = bool(enabled)
@@ -228,19 +230,25 @@ class MouseHandler:
         ):
             self.base._on_event_cb(ViewEventType.CURVE_SELECTED, metadata["curve_tag"])
 
-    def _handle_drag(self, curr_pos: Point2):
-        if self.dragging_cp:
-            self.prev_mouse_pos = Point2(curr_pos)
-            return
+    def _current_modifiers(self) -> frozenset[str]:
+        mods = set()
+        if inputState.isSet("shift"):
+            mods.add("shift")
+        if inputState.isSet("control"):
+            mods.add("control")
+        if inputState.isSet("alt"):
+            mods.add("alt")
+        return frozenset(mods)
 
-        if self.base.mouseWatcherNode.isButtonDown(MouseButton.one()):
-            if self.prev_mouse_pos is not None:
-                delta = curr_pos - self.prev_mouse_pos
-                if delta.lengthSquared() > 0:
-                    self.base.messenger.send("cmd_pan", [delta.getX(), delta.getY()])
-            self.prev_mouse_pos = Point2(curr_pos)
-        else:
-            self.prev_mouse_pos = None
+    def _handle_gestures(self, curr_pos: Point2, left_down: bool):
+        if self.gesture_tracker is None:
+            return
+        self.gesture_tracker.on_frame(
+            left_down=left_down,
+            pos=(curr_pos.getX(), curr_pos.getY()),
+            modifiers=self._current_modifiers(),
+            blocked=self.dragging_cp,
+        )
 
     def update(self, task):
         if not self.base.mouseWatcherNode.hasMouse():
@@ -248,6 +256,8 @@ class MouseHandler:
                 self._finalize_drag(self.drag_last_valid_world_pos)
             self._left_was_down = False
             self.prev_mouse_pos = None
+            if self.gesture_tracker is not None:
+                self.gesture_tracker.reset()
             return task.cont
 
         m_pos = self.base.mouseWatcherNode.getMouse()
@@ -257,10 +267,7 @@ class MouseHandler:
         self._handle_hover(m_pos)
         self._handle_curve_click(m_pos, left_down)
         self._handle_cp_interaction(m_pos, left_down)
-        self._handle_drag(curr_pos)
+        self._handle_gestures(curr_pos, left_down)
 
         self._left_was_down = left_down
         return task.cont
-
-    def is_shift_down(self) -> bool:
-        return inputState.isSet("shift")

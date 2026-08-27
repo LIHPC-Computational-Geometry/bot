@@ -88,6 +88,7 @@ class SplineModel(Observable):
         )
         self._notify_observers()
 
+    @staticmethod
     def preview_evaluate(
         type: str,
         degree: int,

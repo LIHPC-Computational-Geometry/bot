@@ -71,6 +71,9 @@ class ViewEventType(IntEnum):
     # Legitimate: The parent receives an absolute 3D coordinate to instantiate a new free point.
     PICK = 105
 
+    # Legitimate: Domain shortcut fired in the child; payload is ``{"action": str, ...}``.
+    SHORTCUT = 106
+
 
 ParentCommand = SceneUpdateOp | ViewerCommandType
 ParentMessage = tuple[ParentCommand, Any]
@@ -171,6 +174,11 @@ class EventPick(TypedDict):
     world_pos: list[float]
 
 
+class EventShortcut(TypedDict):
+    event_type: Literal[ViewEventType.SHORTCUT]
+    action: str
+
+
 ViewEvent = Union[
     EventHover,
     EventCurveSelected,
@@ -178,6 +186,7 @@ ViewEvent = Union[
     EventCPDrag,
     EventCPPickEnd,
     EventPick,
+    EventShortcut,
 ]
 
 

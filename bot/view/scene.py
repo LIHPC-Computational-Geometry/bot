@@ -30,7 +30,7 @@ class HUDGizmo:
     def __init__(self, parent: NodePath):
         self.root = parent.attachNewNode("hud_gizmo_root")
         self.root.setPos(80, 0, -80)
-        self.root.setScale(400)
+        self.root.setScale(200)
         self._create_axes()
 
     def _create_axes(self):
