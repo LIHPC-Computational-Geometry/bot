@@ -17,7 +17,7 @@ class SplineModel(Observable):
     def __init__(self):
         super().__init__()
         self._model = ferrispline.PyModel()
-        self.curves: [str] = []  # curves' tag
+        self.curves: [str] = []
 
     @staticmethod
     def _default_control_points(coords_a, coords_b, degree=3) -> list[list[float]]:
@@ -45,14 +45,14 @@ class SplineModel(Observable):
         if type == BEZIER_TYP:
             self._notify_observers()
             tag = self._model.create_bezier(
-                degree, np.array(control_points, dtype=np.float64), None
+                degree, np.array(control_points, dtype=np.float64), weights
             )
             self.curves.append(tag)
             return tag
         elif type == NURBS_TYP:
             self._notify_observers()
             tag = self._model.create_nurbs(
-                degree, np.array(control_points, dtype=np.float64), None, None
+                degree, np.array(control_points, dtype=np.float64), knots, weights
             )
             self.curves.append(tag)
             return tag
@@ -73,6 +73,15 @@ class SplineModel(Observable):
     def get_degree(self, tag: str) -> int:
         return self._model.get_degree(tag)
 
+    def get_weights(self, tag: str) -> list[float]:
+        return self._model.get_weights(tag)
+
+    def get_knots(self, tag: str) -> list[float]:
+        return self._model.get_knots(tag)
+
+    def curve_kind(self, tag: str) -> str:
+        return self._model.curve_kind(tag)
+
     def move_control_point(self, tag: str, cp_index: int, new_pt: list[float]):
         self._model.move_control_point(
             tag, cp_index, np.array(new_pt, dtype=np.float64)
@@ -88,5 +97,8 @@ class SplineModel(Observable):
         knots: list[float] = None,
     ) -> list[list[float]]:
         return ferrispline.PyModel().preview_evaluate(
-            type, degree, np.array(control_points, dtype=np.float64), weights, knots, 10
+            type,
+            degree,
+            (np.array(control_points, dtype=np.float64), weights, knots),
+            10,
         )

@@ -14,7 +14,7 @@ from panda3d.core import (
     NodePath,
 )
 import numpy as np
-from bot.core.spline import SplineModel, BEZIER_TYP, NURBS_TYP
+from bot.core.spline import SplineModel
 
 MASK_CURVE_PICK = BitMask32.bit(1)
 MASK_CP_PICK = BitMask32.bit(2)
@@ -30,43 +30,115 @@ class CurveApp:
         self.edges: List = curve_data["edges"]
         self.points: List = curve_data["points"]
         self.type: str = curve_data["type"]
+        self.degree = curve_data.get("degree")
+        self.weights = curve_data.get("weights") or None
 
-        self.node_path: Optional[NodePath] = None
+        # ==========================================
+        # NODEPATH VARIABLES
+        # ==========================================
+
+        # 1. Global object root
+        self.root_node: Optional[NodePath] = None
+
+        # 2. Node of the curve
         self.curve_render_node: Optional[NodePath] = None
+        self.curve_geom_node: Optional[NodePath] = None
         self.curve_collision_node: Optional[NodePath] = None
 
+        # 3. Node of control points
         self.cp_render_node: Optional[NodePath] = None
+        self.cp_points_geom_node: Optional[NodePath] = None
+        self.cp_lines_geom_node: Optional[NodePath] = None
         self.cp_collision_node: Optional[NodePath] = None
-        self.cp_node: Optional[NodePath] = None
 
-        self._curve_geom_node: Optional[NodePath] = None
-        self._cp_geom_node: Optional[NodePath] = None
-        self._cp_line_node: Optional[NodePath] = None
+        # 4. Node of knots
+        self.knots_render_node: Optional[NodePath] = None
+        self.knots_geom_node: Optional[NodePath] = None
 
-        self.control_points: Optional[List] = None
-        self.degree: Optional[int] = None
-        self.knots: Optional[List] = None
+        # ==========================================
+        # CONTROLE POINTS
+        # ==========================================
 
-        self.cp_visible: bool = False
-        self.line_thickness: float = 2.0
+        self.control_points = curve_data.get("control_points", []) or None
         self.cp_color: Optional[List[List[float]]] = None
+        if self.control_points is not None:
+            self.cp_color = [
+                [0.5, 0.5, 0.5, 1.0] for _ in range(len(self.control_points))
+            ]
+
+        # ==========================================
+        # KNOTS
+        # ==========================================
+
+        self.knots = curve_data.get("knots") or None
+        if self.knots is not None:
+            self.knots_color = [
+                [0.8, 0.5, 0.2, 1.0]
+                for _ in range(self.degree, len(self.knots) - self.degree)
+            ]
+
+        # ==========================================
+        # OTHER PROPERTIES
+        # ==========================================
+
+        self.selected: bool = False
+        self.line_thickness: float = 2.0
 
         self.curve_pick_radius: float = 0.2
         self.cp_pick_radius: float = 0.4
 
-        if self.type in (BEZIER_TYP, NURBS_TYP):
-            self.control_points = curve_data.get("control_points", [])
-            self.cp_color = [
-                [0.5, 0.5, 0.5, 1.0] for _ in range(len(self.control_points))
-            ]
-            self.degree = curve_data.get("degree")
-
-        if self.type == NURBS_TYP:
-            self.knots = curve_data.get("knots")
-
     # =========================================================================
     # VISUAL PART (RENDERING)
     # =========================================================================
+
+    def __draw_knots(self, parent_node: NodePath):
+        """Generates the visual geometry for knots by interpolating curve points."""
+        if self.knots is None or self.degree is None or not self.points:
+            return
+
+        format = GeomVertexFormat.getV3cp()
+        vdata = GeomVertexData("knots_data", format, Geom.UHDynamic)
+        vertex_writer = GeomVertexWriter(vdata, "vertex")
+        color_writer = GeomVertexWriter(vdata, "color")
+        prim = GeomPoints(Geom.UHDynamic)
+
+        vertex_index = 0
+        num_points = len(self.points)
+
+        for i in range(self.degree, len(self.knots) - self.degree):
+            t = self.knots[i]
+
+            idx_float = t * (num_points - 1)
+            idx_int = int(idx_float)
+            frac = idx_float - idx_int
+
+            if idx_int >= num_points - 1:
+                pt = self.points[-1]
+            else:
+                p1 = self.points[idx_int]
+                p2 = self.points[idx_int + 1]
+                pt = [
+                    p1[0] + frac * (p2[0] - p1[0]),
+                    p1[1] + frac * (p2[1] - p1[1]),
+                    p1[2] + frac * (p2[2] - p1[2]),
+                ]
+
+            vertex_writer.addData3f(*pt)
+            color_writer.addData4f(*self.knots_color[i - self.degree])
+            prim.addVertex(vertex_index)
+            vertex_index += 1
+
+        prim.closePrimitive()
+        geom = Geom(vdata)
+        geom.addPrimitive(prim)
+        gnode = GeomNode(f"knots_geom_{self.tag}")
+        gnode.addGeom(geom)
+
+        if self.knots_geom_node is not None:
+            self.knots_geom_node.removeNode()
+
+        self.knots_geom_node = parent_node.attachNewNode(gnode)
+        self.knots_geom_node.setRenderModeThickness(12)
 
     def __draw_control_points(self, parent_node: NodePath):
         """Generates the visual geometry for control points and their connections."""
@@ -88,10 +160,11 @@ class CurveApp:
         gnode = GeomNode(f"anchors_{self.tag}")
         gnode.addGeom(geom)
 
-        if self._cp_geom_node is not None:
-            self._cp_geom_node.removeNode()
-        self._cp_geom_node = parent_node.attachNewNode(gnode)
-        self._cp_geom_node.setRenderModeThickness(10)
+        if self.cp_points_geom_node is not None:
+            self.cp_points_geom_node.removeNode()
+
+        self.cp_points_geom_node = parent_node.attachNewNode(gnode)
+        self.cp_points_geom_node.setRenderModeThickness(10)
 
         # Drawing connections (segments)
         lines = LineSegs()
@@ -102,9 +175,10 @@ class CurveApp:
             else:
                 lines.drawTo(*pt)
 
-        if self._cp_line_node is not None:
-            self._cp_line_node.removeNode()
-        self._cp_line_node = parent_node.attachNewNode(lines.create())
+        if self.cp_lines_geom_node is not None:
+            self.cp_lines_geom_node.removeNode()
+
+        self.cp_lines_geom_node = parent_node.attachNewNode(lines.create())
 
     def __draw_curve(self):
         """Generates the main visual line of the curve."""
@@ -115,9 +189,10 @@ class CurveApp:
             lines.moveTo(*self.points[idxA])
             lines.drawTo(*self.points[idxB])
 
-        if self._curve_geom_node is not None:
-            self._curve_geom_node.removeNode()
-        self._curve_geom_node = self.curve_render_node.attachNewNode(lines.create())
+        if self.curve_geom_node is not None:
+            self.curve_geom_node.removeNode()
+
+        self.curve_geom_node = self.curve_render_node.attachNewNode(lines.create())
 
     # =========================================================================
     # PHYSICAL PART (COLLISIONS)
@@ -128,7 +203,7 @@ class CurveApp:
         if self.curve_collision_node is not None:
             self.curve_collision_node.removeNode()
 
-        self.curve_collision_node = self.node_path.attachNewNode("curve_collision")
+        self.curve_collision_node = self.root_node.attachNewNode("curve_collision")
         cnode = CollisionNode(f"col_{self.tag}")
         cnode.setFromCollideMask(BitMask32.allOff())
         cnode.setIntoCollideMask(MASK_CURVE_PICK)
@@ -146,7 +221,6 @@ class CurveApp:
             ptA, ptB = self.points[idxA], self.points[idxB]
             dist_sq = sum((ptA[i] - ptB[i]) ** 2 for i in range(3))
 
-            # Avoids division by zero and infinite hitboxes
             if dist_sq < 1e-5:
                 continue
 
@@ -157,14 +231,14 @@ class CurveApp:
 
     def rebuild_cp_collision(self):
         """Rebuilds the collision spheres for the control points."""
-        if self.control_points is None or self.node_path is None:
+        if self.control_points is None or self.root_node is None:
             return
 
         if self.cp_collision_node is not None:
             self.cp_collision_node.removeNode()
 
-        self.cp_collision_node = self.node_path.attachNewNode("cp_collision")
-        current_mask = MASK_CP_PICK if self.cp_visible else BitMask32.allOff()
+        self.cp_collision_node = self.root_node.attachNewNode("cp_collision")
+        current_mask = MASK_CP_PICK if self.selected else BitMask32.allOff()
 
         for i, pt in enumerate(self.control_points):
             cnode = CollisionNode(f"cp_{self.tag}_{i}")
@@ -184,28 +258,40 @@ class CurveApp:
     def attach_curve_node(self, node_path: NodePath) -> NodePath:
         """Fully initializes the visual and physical hierarchy of the curve."""
         self.__clean_nodes()
-        self.node_path = node_path
-        self.node_path.setTag("curve_tag", str(self.tag))
+        self.root_node = node_path
+        self.root_node.setTag("curve_tag", str(self.tag))
 
-        self.curve_render_node = self.node_path.attachNewNode("curve_render")
+        self.curve_render_node = self.root_node.attachNewNode("curve_render")
         self.__draw_curve()
         self.attach_collision_node()
 
         if self.control_points is not None:
             self.__attach_cp_node()
 
-        return self.node_path
+        if self.knots is not None:
+            self.__attach_knots_node()
+
+        return self.root_node
+
+    def __attach_knots_node(self) -> NodePath:
+        """Initializes the parent node for the curve knots."""
+        self.knots_render_node = self.root_node.attachNewNode("knots_render")
+        self.__draw_knots(self.knots_render_node)
+
+        self.knots_render_node.setLightOff(1)
+        self.knots_render_node.hide()
+        return self.knots_render_node
 
     def __attach_cp_node(self) -> NodePath:
         """Initializes the parent node for the control points."""
-        self.cp_render_node = self.node_path.attachNewNode("cp_render")
-        self.cp_node = self.cp_render_node
+        self.cp_render_node = self.root_node.attachNewNode("cp_render")
+
         self.__draw_control_points(self.cp_render_node)
         self.rebuild_cp_collision()
 
-        self.cp_node.setLightOff(1)
-        self.cp_node.hide()
-        return self.cp_node
+        self.cp_render_node.setLightOff(1)
+        self.cp_render_node.hide()
+        return self.cp_render_node
 
     def __clean_nodes(self):
         """Cleans up all existing nodes before reinitialization."""
@@ -217,12 +303,14 @@ class CurveApp:
             self.cp_render_node.removeNode()
         if self.cp_collision_node:
             self.cp_collision_node.removeNode()
+        if self.knots_render_node:
+            self.knots_render_node.removeNode()
 
     def set_cp_color(self, cp_index: int, color: List[float]):
         """Updates the color of a specific control point and refreshes its rendering."""
         self.cp_color[cp_index] = color
-        if self.cp_node is not None:
-            self.__draw_control_points(self.cp_node)
+        if self.cp_render_node is not None:
+            self.__draw_control_points(self.cp_render_node)
 
     def set_color(self, color: List[float]):
         """Sets the color of the main curve geometry."""
@@ -230,16 +318,21 @@ class CurveApp:
             self.curve_render_node.setColor(*color[:4], 1)
             self.curve_render_node.setLightOff(1)
 
-        if self.cp_node is not None:
-            self.cp_node.show() if self.cp_visible else self.cp_node.hide()
+        if self.cp_render_node is not None:
+            self.cp_render_node.show() if self.selected else self.cp_render_node.hide()
+        if self.knots_render_node is not None:
+            self.knots_render_node.show() if self.selected else self.knots_render_node.hide()
 
-    def set_cp_visible(self, visible: bool):
+    def is_selected(self, visible: bool):
         """Toggles the visibility and collision mask of the control points."""
-        self.cp_visible = visible
-        if self.cp_node is None:
+        self.selected = visible
+        if self.cp_render_node is None:
             return
 
-        self.cp_node.show() if visible else self.cp_node.hide()
+        self.cp_render_node.show() if visible else self.cp_render_node.hide()
+
+        if self.knots_render_node is not None:
+            self.knots_render_node.show() if visible else self.knots_render_node.hide()
 
         if self.cp_collision_node is not None:
             current_mask = MASK_CP_PICK if visible else BitMask32.allOff()
@@ -254,10 +347,14 @@ class CurveApp:
 
         self.control_points[cp_index] = [new_pos[0], new_pos[1], new_pos[2]]
 
-        if self.type == BEZIER_TYP and self.degree is not None:
+        if self.degree is not None:
             pts = SplineModel.preview_evaluate(
-                self.type, self.degree, np.array(self.control_points, dtype=np.float64)
+                self.type,
+                self.degree,
+                np.array(self.control_points, dtype=np.float64),
+                knots=self.knots,
             )
+
             if len(pts.shape) == 2 and pts.shape[0] in (2, 3) and pts.shape[1] > 3:
                 pts = pts.T
 
@@ -268,6 +365,8 @@ class CurveApp:
             self.__draw_curve()
         if self.cp_render_node:
             self.__draw_control_points(self.cp_render_node)
+        if self.knots_render_node is not None:
+            self.__draw_knots(self.knots_render_node)
 
     def update_collision_sizes(self, units_per_pixel: float):
         """Adjusts collision radius based on the current zoom level to maintain consistent screen-space picking."""
@@ -275,7 +374,7 @@ class CurveApp:
         self.curve_pick_radius = safe_units * 6.0
         self.cp_pick_radius = safe_units * 12.0
 
-        if self.node_path is not None:
+        if self.root_node is not None:
             self.attach_collision_node()
             self.rebuild_cp_collision()
 
@@ -286,7 +385,7 @@ class CurveApp:
         self.edges = [(i, i + 1) for i in range(vertex_count - 1)]
         if self.curve_render_node is not None:
             self.__draw_curve()
-        if self.node_path is not None:
+        if self.root_node is not None:
             self.attach_collision_node()
 
     def apply_control_vertices_bytes(self, buf: bytes, cp_count: int) -> None:
@@ -298,3 +397,5 @@ class CurveApp:
         if self.cp_render_node is not None:
             self.__draw_control_points(self.cp_render_node)
             self.rebuild_cp_collision()
+        if self.knots_render_node is not None:
+            self.__draw_knots(self.knots_render_node)

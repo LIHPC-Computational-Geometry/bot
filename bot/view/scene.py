@@ -128,8 +128,8 @@ class Scene:
             curve.update_collision_sizes(self.last_units_per_pixel)
             curve.line_thickness = self.line_thickness
 
-            node_path = geom_root.attachNewNode(f"curve_{tag}")
-            curve.attach_curve_node(node_path)
+            root_node = geom_root.attachNewNode(f"curve_{tag}")
+            curve.attach_curve_node(root_node)
 
         if self.edit_mode_enabled and self.active_curve_tag is not None:
             self.set_active_curve(self.active_curve_tag)
@@ -154,14 +154,14 @@ class Scene:
         if not enabled:
             self.active_curve_tag = None
             for curve in self.curves.values():
-                curve.set_cp_visible(False)
+                curve.is_selected(False)
 
     def set_active_curve(self, tag: Any):
         """Sets the currently selected curve for editing."""
         normalized = str(tag) if tag is not None else None
         self.active_curve_tag = normalized
         for curve_tag, curve in self.curves.items():
-            curve.set_cp_visible(self.edit_mode_enabled and normalized == curve_tag)
+            curve.is_selected(self.edit_mode_enabled and normalized == curve_tag)
 
     def preview_evaluate(self, tag: str, cp_index: int, new_pos: List[float]):
         """Previews the displacement of a control point in real-time."""
@@ -286,8 +286,8 @@ class Scene:
         """Remove curves identified by namespaced tags."""
         for tag in tags:
             curve = self.curves.pop(str(tag), None)
-            if curve is not None and curve.node_path is not None:
-                curve.node_path.removeNode()
+            if curve is not None and curve.root_node is not None:
+                curve.root_node.removeNode()
 
     def load_from_payload(self, payload: ScenePayload) -> None:
         """Load or rebuild the scene from a full add payload."""

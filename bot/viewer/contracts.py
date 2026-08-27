@@ -84,6 +84,8 @@ class CurveGeometry(TypedDict):
     cp_vertices: NotRequired[
         bytes
     ]  # Flat float32 byte array of xyz coordinates for the control points.
+    knots: NotRequired[bytes]
+    weights: NotRequired[bytes]
 
 
 class CurveDelta(TypedDict):
@@ -104,6 +106,12 @@ class CurveDelta(TypedDict):
     cp_count: NotRequired[
         int
     ]  # Number of 3D control points encoded in `geometry["cp_vertices"]`.
+    knot_count: NotRequired[
+        int
+    ]  # Number of knot scalars encoded in `geometry["knots"]`.
+    weight_count: NotRequired[
+        int
+    ]  # Number of weight scalars encoded in `geometry["weights"]`.
 
 
 class ScenePayload(TypedDict):

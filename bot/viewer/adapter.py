@@ -11,7 +11,7 @@ import logging
 from typing import Callable, Protocol
 
 from bot.core.cad import CADModel
-from bot.core.spline import SplineModel, BEZIER_TYP
+from bot.core.spline import SplineModel, BEZIER_TYP, NURBS_TYP
 from bot.viewer.contracts import (
     CurveDelta,
     ScenePayload,
@@ -344,14 +344,23 @@ class SplineAdapter:
         """Discretize one spline into a namespaced render delta."""
         try:
             control_points = self._model.get_control_points(local_id)
-            curve_points = self._model._evaluate(local_id, self._SAMPLE_COUNT)
             degree = self._model.get_degree(local_id)
+            knots = None
+            curve_type = BEZIER_TYP
+            weights = self._model.get_weights(local_id)
+            curve_points = self._model._evaluate(local_id, self._SAMPLE_COUNT)
             edges = [(i, i + 1) for i in range(len(curve_points) - 1)]
+            if self._model.curve_kind(local_id) == NURBS_TYP:
+                knots = self._model.get_knots(local_id)
+                curve_type = NURBS_TYP
+
             return pack_curve_delta(
                 curve_points,
-                curve_type=BEZIER_TYP,
+                curve_type=curve_type,
                 control_points=control_points,
                 degree=degree,
+                knots=knots,
+                weights=weights,
                 edges=edges,
             )
         except Exception as exc:
