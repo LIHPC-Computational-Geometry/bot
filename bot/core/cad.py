@@ -18,6 +18,7 @@ class CADModel(Observable):
         super().__init__()
         self.initialize()
         self.bounds = {"min": [0, 0, 0], "max": [0, 0, 0]}
+        self.scale_factor = 1.0
 
     def initialize(self):
         """
@@ -31,8 +32,6 @@ class CADModel(Observable):
         gmsh.clear()
         # to avoid messages on the console
         gmsh.option.setNumber("General.Verbosity", 0)
-        gmsh.option.setNumber("Mesh.MeshSizeMin", 1)
-        gmsh.option.setNumber("Mesh.MeshSizeMax", 5)
 
     def finalize(self):
         """
@@ -58,6 +57,25 @@ class CADModel(Observable):
         else:
             gmsh.model.occ.importShapes(filename)
 
+        self.__synchronize()
+        bbox = gmsh.model.getBoundingBox(-1, -1)
+        max_size = max(bbox[3] - bbox[0], bbox[4] - bbox[1], bbox[5] - bbox[2])
+
+        if max_size > 0:
+            # Set the maximum distance between points (e.g., 5% of the total model size)
+            gmsh.option.setNumber("Mesh.MeshSizeMax", max_size * 0.05)
+            # Set the minimum distance between points for tiny details (e.g., 0.1% of the size)
+            gmsh.option.setNumber("Mesh.MeshSizeMin", max_size * 0.001)
+
+            # NOTE: Higher value = smoother curves (20 is a good standard for CAD display)
+            gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 20)
+
+        # NOTE: normalize the maximum size of the model to exactly 10.0 units
+        if max_size > 0:
+            self.scale_factor = 10.0 / max_size
+        else:
+            self.scale_factor = 1.0
+
         self._discretize_curves()
         self._recompute_bounds()
         self.__synchronize()
@@ -67,8 +85,14 @@ class CADModel(Observable):
         # The map will be used later to store some geom info
         # node_map = {tag: i for i, tag in enumerate(node_tags)}
         self.points = [
-            (coords[i], coords[i + 1], coords[i + 2]) for i in range(0, len(coords), 3)
+            (
+                coords[i] * self.scale_factor,
+                coords[i + 1] * self.scale_factor,
+                coords[i + 2] * self.scale_factor,
+            )
+            for i in range(0, len(coords), 3)
         ]
+
         if not self.points:
             return
         # Compute now the bounds for automatic rescaling
@@ -90,7 +114,10 @@ class CADModel(Observable):
         Returns the gmsh tag of the new point.
         Notifies all connected viewers.
         """
-        tag = gmsh.model.occ.addPoint(coords[0], coords[1], coords[2], mesh_size)
+        local_coords = [c / self.scale_factor for c in coords]
+        tag = gmsh.model.occ.addPoint(
+            local_coords[0], local_coords[1], local_coords[2], mesh_size
+        )
         gmsh.model.occ.synchronize()
         gmsh.model.mesh.clear()
         gmsh.model.mesh.generate(1)
@@ -194,7 +221,9 @@ class CADModel(Observable):
                 "the dim parameter must be an int comprised between 1 and 2."
             )
 
-        return gmsh.model.getClosestPoint(dim, tag, coord)[0]
+        local_coord = [c / self.scale_factor for c in coord]
+        closest_local = gmsh.model.getClosestPoint(dim, tag, local_coord)[0]
+        return [c * self.scale_factor for c in closest_local]
 
     def get_end_points(self, curve_tag):
         """
@@ -256,7 +285,7 @@ class CADModel(Observable):
         # La dimension 0 correspond aux points dans l'API Gmsh.
         # gmsh.model.getValue(dimension, tag, parametric_coords)
         coords = gmsh.model.getValue(0, point_tag, [])
-        return list(coords)
+        return [c * self.scale_factor for c in coords]
 
     def get_end_points_coords(self, point_tag) -> list[list[float]]:
         """
@@ -314,7 +343,11 @@ class CADModel(Observable):
         ] = {}
         node_tags, coords, _ = gmsh.model.mesh.getNodes()
         node_id_to_coords = {
-            tag: (coords[i * 3], coords[i * 3 + 1], coords[i * 3 + 2])
+            tag: (
+                coords[i * 3] * self.scale_factor,
+                coords[i * 3 + 1] * self.scale_factor,
+                coords[i * 3 + 2] * self.scale_factor,
+            )
             for i, tag in enumerate(node_tags)
         }
 
@@ -350,7 +383,14 @@ class CADModel(Observable):
         gmsh.model.mesh.generate(2)
         # Get mesh nodes
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-        node_coords_3d = list(zip(*(iter(node_coords),) * 3))  # (x, y, z) tuples
+        node_coords_3d = [
+            (
+                node_coords[i * 3] * self.scale_factor,
+                node_coords[i * 3 + 1] * self.scale_factor,
+                node_coords[i * 3 + 2] * self.scale_factor,
+            )
+            for i in range(len(node_tags))
+        ]  # (x, y, z) tuples
 
         # NOTE: Build a node_id -> (x, y, z) map for later use
         node_map = dict(zip(node_tags, node_coords_3d))  # noqa: F841

@@ -18,6 +18,7 @@ class SplineModel(Observable):
         super().__init__()
         self._model = ferrispline.PyModel()
         self.curves: [str] = []
+        self.scale_factor: float = 1.0
 
     @staticmethod
     def _default_control_points(coords_a, coords_b, degree=3) -> list[list[float]]:
@@ -42,6 +43,10 @@ class SplineModel(Observable):
         weights: list[float] = None,
         knots: list[float] = None,
     ) -> str:
+        """
+        Adds a new curve to the model.
+        Automatically scales the control points using the model's scale_factor.
+        """
         if type == BEZIER_TYP:
             self._notify_observers()
             tag = self._model.create_bezier(

@@ -184,11 +184,14 @@ class CurveApp:
         """Generates the main visual line of the curve."""
         lines = LineSegs()
         lines.setThickness(float(self.line_thickness))
+        if self.tag.split(":")[0] == "spline":
+            lines.setColor(0, 1, 1, 1)
+        else:
+            lines.setColor(1, 0, 1, 1)
 
         for idxA, idxB in self.edges:
             lines.moveTo(*self.points[idxA])
             lines.drawTo(*self.points[idxB])
-
         if self.curve_geom_node is not None:
             self.curve_geom_node.removeNode()
 

@@ -44,13 +44,16 @@ class GeomTest(unittest.TestCase):
     def test_closest_points(self):
         cad = CADModel()
         cad.open("data/profil_1.geo")
+
+        sf = cad.scale_factor
+
         # We consider two points simultaneously
-        coords = [2, 0, 0, 4, 2, 0]
+        coords = [2 * sf, 0, 0, 4 * sf, 2 * sf, 0]
         # We get the closest points on the 2nd curve which is a straight line
         # that connects (0,1,0) to (5,1,0)
         outputs = cad.getClosestPoint(1, 2, coords)
         # We know what should be the closest points
-        oracle = [2, 1, 0, 4, 1, 0]
+        oracle = [2 * sf, 1 * sf, 0, 4 * sf, 1 * sf, 0]
 
         # and we compare
         epsilon = 1e-9
