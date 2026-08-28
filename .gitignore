@@ -55,9 +55,6 @@ cover/
 *.mo
 *.pot
 
-# doc repo for pdoc
-docs/
-
 # Scrapy stuff:
 .scrapy
 
