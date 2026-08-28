@@ -48,7 +48,7 @@ Viewer + ACL adapters                           -> process commands -> scene pat
 
 > **Why a subprocess?** OpenGL must run on the main thread of the process owning the window. Running Panda3D in a dedicated subprocess keeps the parent Python session responsive.
 
-See [doc/architecture.md](doc/architecture.md) for the focused IPC guide and [doc/technical_reference_v1.md](doc/technical_reference_v1.md) for the full architecture and data contracts.
+See [architecture.md](docs/architecture.md) for the focused IPC guide and the full architecture and data contracts.
 
 ---
 
@@ -108,8 +108,6 @@ At runtime:
 - parent serializes geometry with `floats_to_bytes` (`bot.viewer.serialize`),
 - `multiprocessing.Pipe` transports pickled `(cmd, data)` tuples,
 - child applies updates via `np.frombuffer(...)` on binary channels for patch updates.
-
-See [doc/technical_reference_v1.md](doc/technical_reference_v1.md#3-core-mechanisms) for the full schema and flow.
 
 ---
 
@@ -173,7 +171,7 @@ Build static HTML into `docs/`:
 uv run pdoc ./bot -o ./docs
 ```
 
-Developer guides are indexed in [doc/index.md](doc/index.md).
+Developer guides are indexed in [index.md](docs/index.md).
 
 ### 5. Continuous integration
 
@@ -193,22 +191,36 @@ bot/
 │   │   ├── cad.py             # CADModel (gmsh/OCC)
 │   │   ├── spline.py          # SplineModel (ferrispline.PyModel wrapper)
 │   │   └── observable.py      # Observer base
+│   ├── math/
+│   │   └── constraints.py     # ConstraintManager for 3D projections
 │   ├── viewer/
 │   │   ├── viewer.py          # Viewer public API, subprocess lifecycle
-│   │   ├── contracts.py       # IPC message types (ScenePayload, ViewEventType, ...)
+│   │   ├── contracts.py       # IPC message types
 │   │   ├── serialize.py       # Float32 packing/unpacking helpers
-│   │   └── adapter.py         # ACL adapters (CADAdapter, SplineAdapter)
-|   |   └── tag.py             # Namespaced curve tag utilities for the viewer adapter boundary
+│   │   ├── tags.py            # Namespaced curve tag utilities & CAD ID parser
+│   │   └── adapters/          # ACL adapters package
+│   │       ├── __init__.py    # Adapter protocol
+│   │       ├── adapter_cad.py
+│   │       ├── adapter_spline.py
+│   │       └── composite.py
 │   ├── view/
 │   │   ├── scene.py           # Scene patch/apply logic
-│   │   └── curve_app.py       # Curve rendering + collision solids
-|   |   └── view.py            # View — Panda3D ShowBase (runs in subprocess)
+│   │   ├── curve_app.py       # Curve rendering + collision solids
+│   │   ├── utils.py           # View-layer utilities (ColorGenerator)
+│   │   └── view.py            # View — Panda3D ShowBase
 │   └── control/
-│       ├── picker.py          # RayPicker raycasting
+│       ├── camera.py          # CameraController
+│       ├── create_tool.py     # CreateSplineTool state machine
+│       ├── cursor_manager.py  # 2D custom cursor overlay
 │       ├── mouse.py           # Mouse interactions and drag sessions
-│       └── keyboard.py        # Shortcuts and axis constraints
+│       ├── picker.py          # RayPicker raycasting
+│       ├── shortcuts_registry.py
+│       └── shortcuts/         # Declarative shortcut engine
+│           ├── __init__.py
+│           ├── binding.py     # Key, Seq, Wheel, Click, Drag, Hold
+│           └── engine.py      # Registry, SequenceBuffer, GestureTracker
 ├── ferrispline/               # Rust/Python NURBS library submodule
-├── doc/                       # Developer docs (index + focused guides + technical reference)
+├── docs/                      # Developer docs
 ├── tests/
 │   ├── unit/
 │   └── system/
